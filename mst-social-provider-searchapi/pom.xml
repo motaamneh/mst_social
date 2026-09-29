@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.motaamneh</groupId>
+        <artifactId>mst-social-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mst-social-provider-searchapi</artifactId>
+    <name>mst-social-provider-searchapi</name>
+    <description>SearchAPI profile evidence adapter for mst_social</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.motaamneh</groupId>
+            <artifactId>mst-social-core</artifactId>
+        </dependency>
+    </dependencies>
+</project>
