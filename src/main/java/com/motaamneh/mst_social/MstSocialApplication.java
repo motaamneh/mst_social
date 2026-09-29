@@ -1,4 +1,4 @@
-package io.github.motaamneh.mstsocial.server;
+package com.motaamneh.mst_social;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
