@@ -1,8 +1,8 @@
 # mst_social
 
-An open-source Java project for verifying control of social accounts through temporary profile-bio challenges.
+An open-source Java project for verifying control of social accounts through temporary profile-bio verification codes.
 
-The repository currently contains the Maven module structure and a Spring Boot application scaffold. Verification logic, the SearchAPI integration, database migrations, and Docker packaging are future implementation steps.
+The repository contains the Maven module structure, the core verification models, and a Spring Boot application scaffold. Code generation and matching, service workflows, the SearchAPI integration, database migrations, and Docker packaging are future implementation steps.
 
 ## Modules
 
@@ -41,7 +41,7 @@ mst-social-provider-searchapi/target/mst-social-provider-searchapi-0.0.1-SNAPSHO
 mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar
 ```
 
-The library JARs are scaffolds until their APIs are implemented. The server retains its Spring Security, JPA, Flyway, and PostgreSQL dependencies. Running it requires database configuration (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`); the intended tenant authentication and verification endpoints are not implemented yet.
+The core contains [verification models and their lifecycle rules](mst-social-core/README.md). The provider library is a scaffold. The server retains its Spring Security, JPA, Flyway, and PostgreSQL dependencies. Running it requires database configuration (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`); the intended tenant authentication and verification endpoints are not implemented yet.
 
 To build only the server and the modules it needs:
 
