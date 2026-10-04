@@ -104,8 +104,8 @@ must still construct URLs from fixed, allowlisted hosts and encode parameters.
 Callers supply timestamps from an injected application `Clock`. These mutable
 objects are not thread-safe; their version counters do not implement database
 locking. The service uses the storage transaction contract described below.
-Actual storage adapters, domain restoration from persisted rows, provider HTTP
-retrieval, and server authentication remain future work. X and Facebook remain
+The server module provides a PostgreSQL storage adapter and Flyway migration.
+Provider HTTP retrieval and server authentication remain future work. X and Facebook remain
 identifiers awaiting support; Instagram and TikTok are the planned integrations.
 
 ## Step 6: storage contract and leases
@@ -227,9 +227,26 @@ var created = service.createVerification(
 var result = service.verify(authenticatedTenantId, created.requestId());
 ```
 
-The core workflow compiles, but running this example requires actual implementations
-of `VerificationStore` and `ProfileProvider`. PostgreSQL mapping/restoration,
-migrations, SearchAPI HTTP integration, and controllers are not implemented here.
+The server's `PostgresVerificationStore` implements the storage port. Running this
+example also requires a configured `ProfileProvider`; SearchAPI HTTP integration
+and controllers remain future work. See the [database setup guide](../mst-social-server/README.md).
+
+## Restoring saved models
+
+Both domain models provide `snapshot()` and a static `restore(snapshot)` factory.
+Each nested `Snapshot` record belongs to one model: requests contain attempts,
+digests, and leases; accounts contain validity and revocation. Their distinct
+fields and validation rules are not combined into a generic record.
+
+Normal constructors create new state. Restoration preserves the saved ID, status,
+version, and deadlines without replaying transitions or recalculating validity
+from today's policy. Snapshots validate state consistency, including terminal
+timestamps, attempt bounds, and lease presence. An expired lease is legitimate
+saved state and can be reclaimed after restoration.
+
+The request snapshot clones digest bytes both on construction and access.
+Both snapshots redact their `toString()` output. They are persistence values,
+not service response objects; do not expose them through HTTP endpoints.
 
 ## Compile
 

@@ -1,0 +1,100 @@
+# PostgreSQL storage
+
+## Connect your existing database
+
+The application defaults to `jdbc:postgresql://localhost:5432/mst_social_db`.
+Set these environment variables in your IntelliJ run configuration or shell:
+
+| Variable | Value |
+| --- | --- |
+| `MST_DB_URL` | JDBC URL for your actual host, port, and database |
+| `MST_DB_USERNAME` | PostgreSQL role that can connect and migrate the schema |
+| `MST_DB_PASSWORD` | Password supplied locally, never committed |
+
+`.env.example` documents the variables. Spring Boot does not load `.env` by itself.
+Use your IDE's environment settings or export variables before starting the app.
+An empty password is allowed only if explicitly configured and your database permits it.
+For a hosted database, use its required TLS JDBC connection settings.
+
+Start `MstSocialApplication` from the IDE after setting the environment, or build
+and run from the repository root:
+
+```sh
+./mvnw -Dmaven.test.skip=true package
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar
+```
+
+This build skips both test compilation and execution. Application startup connects
+to the database and applies Flyway migrations. It does not create the database itself.
+Flyway clean is disabled; Hibernate and Spring SQL initialization do not create tables.
+Do not manually apply the SQL file, enable Hibernate schema updates, or enable Flyway
+baseline to conceal an unexpected existing schema.
+
+The first migration installs `btree_gist`. If your role cannot install it, have your
+database administrator install that extension in `mst_social_db` before startup.
+The role must also be allowed to create tables, indexes, functions, and triggers in
+the target schema. Production deployments may use separate migration/runtime roles.
+
+## Tables created by V1
+
+| Table | Purpose |
+| --- | --- |
+| `tenants` | Application identities and transaction lock rows |
+| `verification_requests` | HMAC digest, state, attempts, saved deadlines, and leases |
+| `verified_accounts` | Verified association, validity, revocation, and version |
+| `verification_account_links` | Immutable request-to-account association |
+| `verification_audit_events` | Minimal event metadata; no code or biography |
+| `flyway_schema_history` | Migration history managed by Flyway |
+
+Tenants are not PostgreSQL usernames or end users. Provision a tenant explicitly
+after migration, using your application's chosen UUID:
+
+```sql
+INSERT INTO tenants (id) VALUES ('<your-tenant-uuid>');
+```
+
+The placeholder is not executable until replaced with a real UUID. The store rejects
+unknown tenants; an arbitrary service call does not create or authenticate one.
+Authentication and subject authorization remain the host application's responsibility.
+
+## Transaction behavior
+
+`PostgresVerificationStore` is discovered as a Spring repository and implements the
+core port using JDBC. It uses the configured `DataSource` and its own explicit JDBC
+transaction manager. It does not map the domain classes as JPA entities.
+
+Each callback runs in one transaction, locks its tenant row first, and executes all
+reads/writes scoped to that tenant. This serializes quota checks and account linking
+across server instances. Different tenants can proceed independently. Callback or
+commit failures roll back writes and audit events together. There is no automatic
+callback replay.
+
+The adapter rejects invocation inside an existing transaction: do not annotate the
+entire verification workflow with `@Transactional`. The core deliberately releases
+its claim transaction before making a provider call.
+
+Loaded entities are detached copies. Explicit saves require the same instance loaded
+or inserted in that callback, with a matching stored version. A callback's transaction
+object cannot be reused after completion or from another thread.
+
+Database constraints prevent overlapping validity intervals for either a platform
+handle or a stable platform account ID within a tenant. Revocation shortens the
+reserved interval; natural expiration allows a later association without a cleanup
+job. Time intervals include their start and exclude their end. These are exclusion
+constraints over PostgreSQL timestamp ranges, backed by `btree_gist`.
+See [PostgreSQL range constraints](https://www.postgresql.org/docs/17/rangetypes.html#RANGETYPES-CONSTRAINT).
+
+Deferred constraint triggers require every VERIFIED request to have a compatible
+account link by commit. Composite foreign keys prevent cross-tenant links.
+The adapter preserves historical account links after revocation or expiry.
+
+PostgreSQL stores timestamp precision to microseconds. Java snapshots preserve the
+exact Instants supplied to them; database round trips use PostgreSQL precision.
+
+## Scope
+
+The persistence code compiles, but database migration and runtime behavior must be
+verified against your running database. No automated tests were added or run.
+SearchAPI retrieval, service bean configuration with HMAC keys, authentication,
+and verification controllers remain separate work. Starting this server does not
+yet provide a usable verification HTTP API.

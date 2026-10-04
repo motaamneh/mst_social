@@ -72,6 +72,68 @@ public final class VerifiedSocialAccount {
         return value;
     }
 
+
+    /** A detached persistence value. It does not perform lifecycle transitions. */
+    public record Snapshot(
+            UUID id,
+            UUID tenantId,
+            String subjectId,
+            Platform platform,
+            String canonicalHandle,
+            String providerAccountId,
+            String evidenceProvider,
+            Instant verifiedAt,
+            Instant validUntil,
+            Instant revokedAt,
+            long version
+    ) {
+        public Snapshot {
+            Objects.requireNonNull(id, "id must not be null");
+            Objects.requireNonNull(tenantId, "tenantId must not be null");
+            requireNonBlank(subjectId, "subjectId");
+            Objects.requireNonNull(platform, "platform must not be null");
+            requireNonBlank(canonicalHandle, "canonicalHandle");
+            if (providerAccountId != null) {
+                requireNonBlank(providerAccountId, "providerAccountId");
+            }
+            requireNonBlank(evidenceProvider, "evidenceProvider");
+            Objects.requireNonNull(verifiedAt, "verifiedAt must not be null");
+            Objects.requireNonNull(validUntil, "validUntil must not be null");
+            if (!validUntil.isAfter(verifiedAt) || version < 0
+                    || (revokedAt != null && revokedAt.isBefore(verifiedAt))) {
+                throw new IllegalArgumentException("Invalid saved account state");
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "VerifiedSocialAccount.Snapshot[redacted]";
+        }
+    }
+
+    public Snapshot snapshot() {
+        return new Snapshot(id, tenantId, subjectId, platform, canonicalHandle, providerAccountId, evidenceProvider, verifiedAt, validUntil, revokedAt, version);
+    }
+
+    /** Restores exact saved state, including historical deadlines and version. */
+    public static VerifiedSocialAccount restore(Snapshot snapshot) {
+        return new VerifiedSocialAccount(Objects.requireNonNull(snapshot, "snapshot must not be null"));
+    }
+
+    private VerifiedSocialAccount(Snapshot snapshot) {
+        this.id = snapshot.id();
+        this.tenantId = snapshot.tenantId();
+        this.subjectId = snapshot.subjectId();
+        this.platform = snapshot.platform();
+        this.canonicalHandle = snapshot.canonicalHandle();
+        this.providerAccountId = snapshot.providerAccountId();
+        this.evidenceProvider = snapshot.evidenceProvider();
+        this.verifiedAt = snapshot.verifiedAt();
+        this.validUntil = snapshot.validUntil();
+        this.revokedAt = snapshot.revokedAt();
+        this.version = snapshot.version();
+    }
+
     public UUID getId() {
         return id;
     }
