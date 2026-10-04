@@ -200,6 +200,107 @@ public final class VerificationRequest {
         return value;
     }
 
+
+    /** A detached persistence value. It does not perform lifecycle transitions. */
+    public record Snapshot(
+            UUID id,
+            UUID tenantId,
+            String subjectId,
+            Platform platform,
+            String normalizedHandle,
+            byte[] codeDigest,
+            String codeKeyVersion,
+            Instant createdAt,
+            Instant expiresAt,
+            int maxFailedAttempts,
+            VerificationStatus status,
+            int failedAttempts,
+            Instant verifiedAt,
+            Instant canceledAt,
+            long version,
+            UUID verificationLeaseId,
+            Instant leaseExpiresAt
+    ) {
+        public Snapshot {
+            Objects.requireNonNull(id, "id must not be null");
+            Objects.requireNonNull(tenantId, "tenantId must not be null");
+            requireNonBlank(subjectId, "subjectId");
+            Objects.requireNonNull(platform, "platform must not be null");
+            requireNonBlank(normalizedHandle, "normalizedHandle");
+            requireNonBlank(codeKeyVersion, "codeKeyVersion");
+            Objects.requireNonNull(codeDigest, "codeDigest must not be null");
+            if (codeDigest.length != 32) {
+                throw new IllegalArgumentException("codeDigest must contain 32 bytes");
+            }
+            codeDigest = codeDigest.clone();
+            Objects.requireNonNull(createdAt, "createdAt must not be null");
+            Objects.requireNonNull(expiresAt, "expiresAt must not be null");
+            Objects.requireNonNull(status, "status must not be null");
+            if (!expiresAt.isAfter(createdAt) || maxFailedAttempts <= 0 || version < 0
+                    || failedAttempts < 0 || failedAttempts > maxFailedAttempts) {
+                throw new IllegalArgumentException("Invalid saved request bounds");
+            }
+            if ((status == VerificationStatus.LOCKED) != (failedAttempts == maxFailedAttempts)) {
+                throw new IllegalArgumentException("Attempt count does not match saved status");
+            }
+            if ((status == VerificationStatus.VERIFIED) != (verifiedAt != null)
+                    || (status == VerificationStatus.CANCELED) != (canceledAt != null)) {
+                throw new IllegalArgumentException("Saved terminal timestamps do not match status");
+            }
+            if ((verifiedAt != null && (verifiedAt.isBefore(createdAt) || !verifiedAt.isBefore(expiresAt)))
+                    || (canceledAt != null && (canceledAt.isBefore(createdAt) || !canceledAt.isBefore(expiresAt)))) {
+                throw new IllegalArgumentException("Saved event time is outside request lifetime");
+            }
+            if (status == VerificationStatus.VERIFYING) {
+                if (verificationLeaseId == null || leaseExpiresAt == null
+                        || !leaseExpiresAt.isAfter(createdAt) || leaseExpiresAt.isAfter(expiresAt)) {
+                    throw new IllegalArgumentException("Saved verifying request requires a valid lease");
+                }
+            } else if (verificationLeaseId != null || leaseExpiresAt != null) {
+                throw new IllegalArgumentException("Only verifying requests may retain a lease");
+            }
+        }
+
+        @Override
+        public byte[] codeDigest() {
+            return codeDigest.clone();
+        }
+
+        @Override
+        public String toString() {
+            return "VerificationRequest.Snapshot[redacted]";
+        }
+    }
+
+    public Snapshot snapshot() {
+        return new Snapshot(id, tenantId, subjectId, platform, normalizedHandle, codeDigest, codeKeyVersion, createdAt, expiresAt, maxFailedAttempts, status, failedAttempts, verifiedAt, canceledAt, version, verificationLeaseId, leaseExpiresAt);
+    }
+
+    /** Restores exact saved state, including historical deadlines and version. */
+    public static VerificationRequest restore(Snapshot snapshot) {
+        return new VerificationRequest(Objects.requireNonNull(snapshot, "snapshot must not be null"));
+    }
+
+    private VerificationRequest(Snapshot snapshot) {
+        this.id = snapshot.id();
+        this.tenantId = snapshot.tenantId();
+        this.subjectId = snapshot.subjectId();
+        this.platform = snapshot.platform();
+        this.normalizedHandle = snapshot.normalizedHandle();
+        this.codeDigest = snapshot.codeDigest();
+        this.codeKeyVersion = snapshot.codeKeyVersion();
+        this.createdAt = snapshot.createdAt();
+        this.expiresAt = snapshot.expiresAt();
+        this.maxFailedAttempts = snapshot.maxFailedAttempts();
+        this.status = snapshot.status();
+        this.failedAttempts = snapshot.failedAttempts();
+        this.verifiedAt = snapshot.verifiedAt();
+        this.canceledAt = snapshot.canceledAt();
+        this.version = snapshot.version();
+        this.verificationLeaseId = snapshot.verificationLeaseId();
+        this.leaseExpiresAt = snapshot.leaseExpiresAt();
+    }
+
     public UUID getId() {
         return id;
     }

@@ -41,7 +41,7 @@ mst-social-provider-searchapi/target/mst-social-provider-searchapi-0.0.1-SNAPSHO
 mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar
 ```
 
-The core contains [verification models and their lifecycle rules](mst-social-core/README.md). The provider library is a scaffold. The server retains its Spring Security, JPA, Flyway, and PostgreSQL dependencies. Running it requires database configuration (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`); the intended tenant authentication and verification endpoints are not implemented yet.
+The core contains [verification models, restoration, and workflow rules](mst-social-core/README.md). The provider library is a scaffold. The server includes a JDBC PostgreSQL verification store and a Flyway migration. Configure `MST_DB_URL`, `MST_DB_USERNAME`, and `MST_DB_PASSWORD` as described in the [database setup guide](mst-social-server/README.md). Tenant authentication, SearchAPI integration, and verification endpoints are not implemented yet.
 
 To build only the server and the modules it needs:
 
