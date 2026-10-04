@@ -1,6 +1,7 @@
 package com.motaamneh.mstsocial.core.model;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -24,6 +25,8 @@ public final class VerificationRequest {
     private Instant verifiedAt;
     private Instant canceledAt;
     private long version;
+    private UUID verificationLeaseId;
+    private Instant leaseExpiresAt;
 
     public VerificationRequest(
             UUID id,
@@ -78,22 +81,49 @@ public final class VerificationRequest {
         this.version = 0;
     }
 
-    public void beginVerification(Instant now) {
-        requireStatus(VerificationStatus.PENDING);
+    /** Claims a pending request, or replaces an expired worker lease. */
+    public void beginVerification(UUID leaseId, Duration leaseDuration, Instant now) {
+        Objects.requireNonNull(leaseId, "leaseId must not be null");
+        Objects.requireNonNull(leaseDuration, "leaseDuration must not be null");
+        if (leaseDuration.isNegative() || leaseDuration.isZero()) {
+            throw new IllegalArgumentException("leaseDuration must be positive");
+        }
+        if (leaseId.equals(verificationLeaseId)) {
+            throw new IllegalArgumentException("A replacement lease must have a new ID");
+        }
         requireBeforeExpiry(now);
+        if (status != VerificationStatus.PENDING
+                && (status != VerificationStatus.VERIFYING || now.isBefore(leaseExpiresAt))) {
+            throw new IllegalStateException("Verification request cannot be claimed");
+        }
+        Instant deadline = now.plus(leaseDuration);
+        this.verificationLeaseId = leaseId;
+        this.leaseExpiresAt = deadline.isBefore(expiresAt) ? deadline : expiresAt;
         changeStatus(VerificationStatus.VERIFYING);
     }
 
-    public void markVerified(Instant now) {
-        requireStatus(VerificationStatus.VERIFYING);
-        requireBeforeExpiry(now);
+    public boolean ownsLease(UUID leaseId, Instant now) {
+        Objects.requireNonNull(leaseId, "leaseId must not be null");
+        requireValidTime(now);
+        return status == VerificationStatus.VERIFYING
+                && leaseId.equals(verificationLeaseId)
+                && now.isBefore(leaseExpiresAt) && now.isBefore(expiresAt);
+    }
+
+    private void requireLease(UUID leaseId, Instant now) {
+        if (!ownsLease(leaseId, now)) {
+            throw new IllegalStateException("Verification lease is no longer owned");
+        }
+    }
+
+    public void markVerified(UUID leaseId, Instant now) {
+        requireLease(leaseId, now);
         this.verifiedAt = now;
         changeStatus(VerificationStatus.VERIFIED);
     }
 
-    public void recordMismatch(Instant now) {
-        requireStatus(VerificationStatus.VERIFYING);
-        requireBeforeExpiry(now);
+    public void recordMismatch(UUID leaseId, Instant now) {
+        requireLease(leaseId, now);
         this.failedAttempts++;
         if (this.failedAttempts >= this.maxFailedAttempts) {
             changeStatus(VerificationStatus.LOCKED);
@@ -102,9 +132,8 @@ public final class VerificationRequest {
         }
     }
 
-    public void recordProviderFailure(Instant now) {
-        requireStatus(VerificationStatus.VERIFYING);
-        requireBeforeExpiry(now);
+    public void recordProviderFailure(UUID leaseId, Instant now) {
+        requireLease(leaseId, now);
         changeStatus(VerificationStatus.PENDING);
     }
 
@@ -138,12 +167,6 @@ public final class VerificationRequest {
         return !status.isTerminal() && !now.isBefore(expiresAt);
     }
 
-    private void requireStatus(VerificationStatus expected) {
-        if (status != expected) {
-            throw new IllegalStateException("Expected status " + expected + " but was " + status);
-        }
-    }
-
     private void requireBeforeExpiry(Instant now) {
         requireValidTime(now);
         if (!now.isBefore(expiresAt)) {
@@ -160,6 +183,10 @@ public final class VerificationRequest {
 
     private void changeStatus(VerificationStatus newStatus) {
         this.status = newStatus;
+        if (newStatus != VerificationStatus.VERIFYING) {
+            this.verificationLeaseId = null;
+            this.leaseExpiresAt = null;
+        }
         this.version++;
     }
 
@@ -231,5 +258,13 @@ public final class VerificationRequest {
 
     public long getVersion() {
         return version;
+    }
+
+    public UUID getVerificationLeaseId() {
+        return verificationLeaseId;
+    }
+
+    public Instant getLeaseExpiresAt() {
+        return leaseExpiresAt;
     }
 }
