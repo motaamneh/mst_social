@@ -10,7 +10,7 @@ public record VerificationPolicy(
 ) {
     public static final VerificationPolicy DEFAULT = new VerificationPolicy(
             Duration.ofMinutes(15),
-            5,
+            10,
             1,
             Duration.ofMinutes(1)
     );

@@ -13,8 +13,8 @@ This module uses Java 21 and the Java standard library. Its package is
 | `VerificationRequest` | Temporary request, digest, attempt accounting, and controlled state transitions |
 | `VerifiedSocialAccount` | Verified account association, validity deadline, and revocation |
 
-Default policy: a 15-minute request, five mismatches, one calendar year of account
-validity, and a one-minute lease setting for the future verification workflow.
+Default policy: a 15-minute request, ten mismatches, one calendar year of account
+validity, and a one-minute verification lease.
 The policy accessors are `requestLifetime()`, `maxFailedAttempts()`,
 `verifiedAccountLifetimeYears()`, and `verificationLeaseDuration()`.
 
@@ -28,10 +28,10 @@ The digest is defensively copied on input and output; no plaintext code is store
 
 | Operation | Required state | Result |
 | --- | --- | --- |
-| `beginVerification(now)` | `PENDING` | `VERIFYING` |
-| `markVerified(now)` | `VERIFYING` | `VERIFIED`, with `verifiedAt` recorded |
-| `recordMismatch(now)` | `VERIFYING` | Increment failed attempts; return to `PENDING`, or become `LOCKED` at the limit |
-| `recordProviderFailure(now)` | `VERIFYING` | Return to `PENDING` without consuming a mismatch attempt |
+| `beginVerification(leaseId, duration, now)` | `PENDING`, or `VERIFYING` with expired lease | `VERIFYING` with a fresh lease |
+| `markVerified(leaseId, now)` | Own a live lease | `VERIFIED`, with `verifiedAt` recorded |
+| `recordMismatch(leaseId, now)` | Own a live lease | Increment failed attempts; return to `PENDING`, or become `LOCKED` at the limit |
+| `recordProviderFailure(leaseId, now)` | Own a live lease | Return to `PENDING` without consuming a mismatch attempt |
 | `cancel(now)` | `PENDING` or `VERIFYING` | `CANCELED`, with `canceledAt` recorded |
 | `expireIfDue(now)` | Any nonterminal state at or beyond the deadline | `EXPIRED`; returns whether state changed |
 
@@ -103,11 +103,133 @@ must still construct URLs from fixed, allowlisted hosts and encode parameters.
 
 Callers supply timestamps from an injected application `Clock`. These mutable
 objects are not thread-safe; their version counters do not implement database
-locking. Provider support, evidence retrieval, tenant
-authorization, storage restoration, account renewal, leases, and atomic storage
-completion belong to subsequent implementation steps. X and Facebook remain
-identifiers awaiting a supported provider, while Instagram and TikTok are the
-planned initial integrations.
+locking. The service uses the storage transaction contract described below.
+Actual storage adapters, domain restoration from persisted rows, provider HTTP
+retrieval, and server authentication remain future work. X and Facebook remain
+identifiers awaiting support; Instagram and TikTok are the planned integrations.
+
+## Step 6: storage contract and leases
+
+`port.VerificationStore` is a persistence interface, not a database implementation.
+`inTransaction(tenantId, callback)` gives the callback a tenant-scoped transaction.
+The service explicitly inserts or saves entities. The adapter must commit all
+writes, request-to-account associations, and audit events together, or roll them
+all back. Callback results must only be returned after commit succeeds.
+
+Transactions within a tenant must be serialized across all application instances.
+For the first PostgreSQL adapter, locking a tenant row before accessing its
+requests/accounts is a straightforward implementation. Database constraints must
+also enforce identity and request-to-account uniqueness. A plain sequence of
+independent repository saves does not satisfy this contract. Transaction callbacks
+must not be automatically replayed or let mutable entities escape.
+
+The same transaction checks creation quotas and inserts the new request.
+`VerificationLimits.DEFAULT` allows three active requests per subject and three
+per platform/handle within a tenant. These are configurable application defaults.
+A duplicate active request for the same subject/platform/handle is rejected.
+Active counts exclude expired deadlines and all terminal states.
+These limits do not replace HTTP rate limiting for paid provider lookups.
+
+Each attempt has a random lease ID and a lease deadline capped at request expiry.
+An expired lease can be replaced by a fresh ID. Completion must present the current,
+unexpired lease. Cancellation and terminal transitions clear lease ownership.
+No background lease worker is required: the next verify call can reclaim an
+expired lease. A late response returns `STALE_ATTEMPT` without changing the request.
+
+## Step 7: service inputs and outputs
+
+The `service` package contains ordinary Java records:
+
+| Type | Purpose |
+| --- | --- |
+| `CreateVerificationCommand` | Subject, platform, and submitted handle |
+| `VerificationCreated` | Request ID, plaintext code, expiry; code is redacted in `toString()` |
+| `VerificationView` | Immutable request status, attempt counts, and timestamps |
+| `VerifiedAccountView` | Immutable association details and activity at read time |
+| `VerificationResult` | Outcome, request view, optional account or provider failure details |
+
+Only creation returns the plaintext code. Do not persist or log that response.
+No response contains the stored digest, key version, worker lease, or biography.
+The tenant is a separate service argument supplied by the authenticated host.
+The host must also authorize the subject and resource for its end user.
+
+`VerificationException.code()` identifies missing resources, unsupported platforms,
+duplicate active requests, and creation-limit failures. Malformed input uses normal
+Java argument validation. Provider failures are typed results, not leaked exceptions.
+
+## Step 8: verification service
+
+`service.VerificationService` exposes:
+
+| Method | Behavior |
+| --- | --- |
+| `createVerification(tenantId, command)` | Normalize, generate, hash, enforce quotas, insert, return code once |
+| `getVerification(tenantId, requestId)` | Return status, persisting expiry when due |
+| `verify(tenantId, requestId)` | Claim, fetch evidence, check it, atomically complete |
+| `cancelVerification(tenantId, requestId)` | Cancel nonterminal requests; terminal requests stay unchanged |
+| `getVerifiedAccount(tenantId, accountId)` | Return association and current activity |
+| `revokeVerifiedAccount(tenantId, accountId)` | Revoke and append audit metadata in the same transaction |
+
+Verification has three phases:
+
+1. **Claim transaction:** check expiry/state and claim a lease. Existing live work
+   returns `IN_PROGRESS`. Already verified requests return the original association
+   without another provider call.
+2. **Outside the transaction:** fetch the provider profile once; normalize and
+   compare the returned handle; match the code against its HMAC digest.
+3. **Completion transaction:** reread the request; check expiry, terminal state,
+   and lease ownership; persist the outcome and audit event.
+
+A provider failure, invalid returned handle, or invalid evidence timestamp consumes
+no mismatch attempt. A successfully fetched matching profile without the code
+consumes one attempt; the final allowed mismatch produces `LOCKED`.
+Returned handles must normalize to the requested handle. Evidence explicitly dated
+before request creation or after its fetch is rejected; unknown source timestamps
+remain unknown. Adapters must use the application clock for fetch timestamps.
+The service does not guarantee source freshness when the provider omits that time.
+
+Expected provider failures preserve their retry metadata. A null provider result
+becomes `INVALID_PROVIDER_RESPONSE`; an unexpected adapter runtime exception
+becomes `PROVIDER_ERROR` with no automatic retry. Infrastructure/store failures
+propagate, and programming/configuration errors outside the provider call are not
+silently treated as code mismatches.
+
+On success, all active links matching either the handle or stable platform ID are
+checked. A different subject, conflicting stable ID, or multiple matching links
+produces `ACCOUNT_ALREADY_LINKED` without consuming a mismatch attempt.
+A single compatible active link for the same subject is reused without extending
+its validity. Otherwise a new account receives one calendar year of validity by
+default. Account creation, request verification, their association, and audit
+metadata commit together. Full biographies are never passed into storage.
+
+Revocation is idempotent. Re-verifying an already successful request cannot reactivate
+a revoked or expired association; the returned account view has `active=false`.
+A new verification request is required.
+
+### Wiring the service
+
+The constructor receives a store adapter, profile provider, code generator, hasher,
+handle normalizer, verification policy, creation limits, clock, and active HMAC key
+version. Keep older HMAC keys configured until their pending requests expire.
+
+```java
+var service = new VerificationService(
+        store, provider, generator, hasher, new HandleNormalizer(),
+        VerificationPolicy.DEFAULT, VerificationLimits.DEFAULT,
+        Clock.systemUTC(), activeKeyVersion);
+
+var created = service.createVerification(
+        authenticatedTenantId,
+        new CreateVerificationCommand(subjectId, Platform.INSTAGRAM, handle));
+
+// Deliver created.code() privately to the user for placement in their bio.
+// After the user explicitly asks to verify:
+var result = service.verify(authenticatedTenantId, created.requestId());
+```
+
+The core workflow compiles, but running this example requires actual implementations
+of `VerificationStore` and `ProfileProvider`. PostgreSQL mapping/restoration,
+migrations, SearchAPI HTTP integration, and controllers are not implemented here.
 
 ## Compile
 
