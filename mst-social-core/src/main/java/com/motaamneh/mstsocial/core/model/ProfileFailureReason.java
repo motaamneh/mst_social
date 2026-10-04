@@ -1,0 +1,12 @@
+package com.motaamneh.mstsocial.core.model;
+
+public enum ProfileFailureReason {
+    PROFILE_NOT_FOUND,
+    PROFILE_UNAVAILABLE,
+    PROVIDER_RATE_LIMITED,
+    PROVIDER_AUTHENTICATION_FAILED,
+    PROVIDER_TIMEOUT,
+    INVALID_PROVIDER_RESPONSE,
+    UNSUPPORTED_PLATFORM,
+    PROVIDER_ERROR;
+}
