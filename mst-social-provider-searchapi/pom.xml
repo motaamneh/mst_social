@@ -18,5 +18,9 @@
             <groupId>com.motaamneh</groupId>
             <artifactId>mst-social-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
     </dependencies>
 </project>
