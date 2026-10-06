@@ -18,3 +18,14 @@ spring:
   sql:
     init:
       mode: never
+
+mst:
+  searchapi:
+    api-key: ${SEARCHAPI_API_KEY:}
+    connect-timeout: 5s
+    request-timeout: 20s
+    max-response-bytes: 1048576
+  verification:
+    active-key-version: v1
+    keys:
+      v1: ${MST_VERIFICATION_KEY_V1:}
