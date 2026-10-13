@@ -2,7 +2,7 @@
 
 An open-source Java project for verifying control of social accounts through temporary profile-bio verification codes.
 
-The repository contains the Maven module structure, the core verification models, and a Spring Boot application scaffold. Code generation and matching, service workflows, the SearchAPI integration, database migrations, and Docker packaging are future implementation steps.
+The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot server with PostgreSQL storage and tenant API-key authentication. Verification HTTP endpoints and Docker packaging are the next implementation steps.
 
 ## Modules
 
@@ -41,7 +41,7 @@ mst-social-provider-searchapi/target/mst-social-provider-searchapi-0.0.1-SNAPSHO
 mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar
 ```
 
-The core contains [verification models, restoration, and workflow rules](mst-social-core/README.md). The provider library is a scaffold. The server includes a JDBC PostgreSQL verification store and a Flyway migration. Configure `MST_DB_URL`, `MST_DB_USERNAME`, and `MST_DB_PASSWORD` as described in the [database setup guide](mst-social-server/README.md). Tenant authentication, SearchAPI integration, and verification endpoints are not implemented yet.
+The core contains [verification models, restoration, and workflow rules](mst-social-core/README.md). The [SearchAPI provider](mst-social-provider-searchapi/README.md) retrieves Instagram and TikTok biographies. The server includes JDBC persistence, Flyway migrations, and stateless tenant API-key authentication. Follow the [server setup and credential guide](mst-social-server/README.md) to configure the database and secrets, provision a tenant key, and call `GET /api/v1/tenant`. Verification HTTP endpoints are not implemented yet.
 
 To build only the server and the modules it needs:
 

@@ -18,8 +18,25 @@ spring:
   sql:
     init:
       mode: never
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+      include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
 
 mst:
+  tenant-api-keys:
+    hash-key: ${MST_TENANT_API_KEY_HASH_KEY:}
   searchapi:
     api-key: ${SEARCHAPI_API_KEY:}
     connect-timeout: 5s
