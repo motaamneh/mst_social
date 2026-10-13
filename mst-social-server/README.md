@@ -1,4 +1,8 @@
-# PostgreSQL storage
+# MST Social server
+
+The server wires the plain Java verification service to SearchAPI and PostgreSQL.
+It authenticates application backends with tenant API keys. This branch includes
+an identity endpoint; the verification HTTP controllers are the next step.
 
 ## Connect your existing database
 
@@ -11,10 +15,27 @@ Set these environment variables in your IntelliJ run configuration or shell:
 | `MST_DB_USERNAME` | PostgreSQL role that can connect and migrate the schema |
 | `MST_DB_PASSWORD` | Password supplied locally, never committed |
 
-`.env.example` documents the variables. Spring Boot does not load `.env` by itself.
-Use your IDE's environment settings or export variables before starting the app.
+Spring Boot does not load `.env` by itself. Use your IDE's environment settings or
+export variables before starting the app.
 An empty password is allowed only if explicitly configured and your database permits it.
 For a hosted database, use its required TLS JDBC connection settings.
+
+The HTTP application also requires:
+
+| Variable | Purpose |
+| --- | --- |
+| `SEARCHAPI_API_KEY` | Provider credential for Instagram and TikTok lookups |
+| `MST_VERIFICATION_KEY_V1` | 32 random bytes encoded as 64 hexadecimal characters, used for verification codes |
+| `MST_TENANT_API_KEY_HASH_KEY` | A separate 32-byte random secret encoded as 64 hexadecimal characters, used for tenant API-key digests |
+
+Generate each internal secret separately with `openssl rand -hex 32`, then store
+it in your local environment or deployment secret manager. Keep these secrets
+stable across restarts and consistent across instances. Do not reuse a SearchAPI
+key or a verification-code key as the tenant-key hash secret.
+
+Changing `MST_TENANT_API_KEY_HASH_KEY` invalidates existing tenant credentials.
+Routine credential rotation uses the create/revoke commands below and leaves this
+server secret unchanged. Retain it securely when backing up the database.
 
 Start `MstSocialApplication` from the IDE after setting the environment, or build
 and run from the repository root:
@@ -59,9 +80,175 @@ core service. Audit-event IDs are database-generated incrementing integers.
 Subject IDs come from the consuming application's users; foreign keys reference
 existing IDs and must not generate new ones.
 
-The store rejects
-unknown tenants; an arbitrary service call does not create or authenticate one.
-Authentication and subject authorization remain the host application's responsibility.
+The store rejects unknown tenants; an arbitrary service call does not create one.
+HTTP tenant identity comes from the validated credential. The consuming application
+must still authenticate its own users and decide which subject IDs they may use.
+
+## Tenant API-key authentication
+
+V3 creates `tenant_api_keys`. Each row contains a generated credential UUID,
+the owning tenant UUID, a name, a 32-byte HMAC-SHA256 digest, creation time,
+optional expiry, and optional revocation time. The secret itself is never stored.
+
+A credential has this format:
+
+```text
+mst_api_<credential-uuid>.<64-lowercase-hex-characters>
+```
+
+The part after the dot is a cryptographically random 32-byte secret. The UUID
+selects the database row; knowing it alone does not authenticate a caller. The
+codec calculates HMAC-SHA256 over the decoded secret bytes using the dedicated
+server hash key. Authentication compares the stored and presented digests with
+`MessageDigest.isEqual` and checks the credential's lifetime.
+
+### 1. Build and migrate
+
+Set the environment variables above, build the JAR, and start the server with the
+commands in the setup section. Flyway applies V3 automatically. Keep the existing
+V1/V2 migrations unchanged. The local administration command also initializes
+Flyway before performing its operation.
+
+### 2. Choose a tenant
+
+Use an existing tenant's UUID or create one in your database console:
+
+```sql
+INSERT INTO tenants DEFAULT VALUES RETURNING id;
+```
+
+The tenant represents a consuming application, such as your Next.js backend.
+One tenant can have several credentials, so staging, deployment, and rotation
+do not require sharing one key.
+
+### 3. Create a credential locally
+
+In an **interactive terminal**, set the three database variables and the same
+`MST_TENANT_API_KEY_HASH_KEY` used by your server. Then run:
+
+```sh
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-key create \
+  --tenant-id="<your-tenant-uuid>" \
+  --name="Development backend"
+```
+
+Replace the angle-bracket placeholder before running the command. Add
+`--expires-at=2030-01-01T00:00:00Z` to schedule expiry; choose a date in the future.
+Without it, the credential stays active until revoked. PostgreSQL timestamp
+precision is one microsecond; provisioning normalizes timestamps to that precision.
+
+The command prints the credential ID and the full credential **once**, after its
+database insert succeeds. Save it immediately in your backend's secret storage.
+It cannot be retrieved from the database later. Creation refuses to run without
+an interactive console, which prevents accidentally redirecting the secret into
+ordinary command logs. Run this command in Terminal, rather than an IDE Run console.
+
+The command boots a separate Spring context with database and provisioning beans.
+It opens no HTTP port, makes no provider request, and does not require
+`SEARCHAPI_API_KEY` or `MST_VERIFICATION_KEY_V1`. It uses your local database access
+as administrator authority. There is no public HTTP endpoint for creating keys.
+
+### 4. Check your key in Postman
+
+With the normal server running:
+
+1. Create a `GET http://localhost:8080/api/v1/tenant` request.
+2. Open **Authorization**, select **Bearer Token**, and paste the full credential.
+3. Send the request. A valid key returns HTTP `200` with:
+
+```json
+{
+  "tenantId": "<the tenant UUID from the stored credential>",
+  "credentialId": "<the credential UUID>"
+}
+```
+
+Do not send `tenantId` in a header, query string, or body to select a tenant. This
+endpoint obtains both IDs from the authenticated principal. It does not call
+SearchAPI or create a verification request.
+
+| Request condition | Result |
+| --- | --- |
+| Active credential with the correct secret | `200` from the identity endpoint |
+| Missing, malformed, unknown, expired, revoked, or incorrect key | `401`, code `UNAUTHORIZED` |
+| Duplicate Authorization headers or a different authentication scheme | `401`, code `UNAUTHORIZED` |
+| Database failure during a correctly formatted credential lookup | `503`, code `AUTHENTICATION_UNAVAILABLE` |
+| Anonymous `GET /actuator/health` | Aggregate health only: normally `200`, or `503` if unhealthy |
+
+Authentication errors use `application/problem+json`, for example:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "code": "UNAUTHORIZED"
+}
+```
+
+The `401` response includes `WWW-Authenticate: Bearer realm="mst-social"`.
+No error response returns a credential, digest, SQL statement, or exception text.
+Authentication is stateless: there is no session, generated development password,
+form login, or Basic authentication. The filter reads exactly one Authorization
+header, and only `Bearer <credential>` is accepted. Credentials are not accepted
+from cookies or query parameters. CSRF protection is disabled for this explicit
+header authentication model. Other application paths are denied; actuator exposes
+only health, without component details.
+
+Keep the tenant credential on your application **backend**. For Next.js, use a
+server-only environment variable, never `NEXT_PUBLIC_...`. Browser and mobile
+clients should call your own backend, which makes authenticated requests to MST
+Social. Use HTTPS when sending credentials outside localhost.
+
+### 5. Revoke or rotate a credential
+
+To revoke a key using the IDs printed during creation:
+
+```sh
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-key revoke \
+  --tenant-id="<your-tenant-uuid>" \
+  --credential-id="<credential-uuid>"
+```
+
+The update includes both IDs, so it cannot revoke a key belonging to another
+tenant. Repeating it preserves the original revocation timestamp. Authentication
+reloads the row on every request, so later requests fail after revocation commits.
+A request that already authenticated can still finish.
+
+For rotation, create another key for the same tenant, update your backend to use
+it, check the identity endpoint, then revoke the old key. No server restart is
+needed. Multiple keys can be active during the switch.
+
+Run `java -jar <server.jar> tenant-key --help` for usage. Exit codes are `0` for
+success, `1` for an operation/startup failure, `2` for invalid input or a missing
+interactive console, and `3` when revocation changed no row.
+
+### How the classes connect
+
+```text
+HTTP request with Authorization: Bearer ...
+  -> SecurityConfiguration's filter chain
+  -> TenantApiKeyAuthenticationFilter reads the credential
+  -> TenantAuthenticationService validates its format and secret
+       -> TenantApiKeyCodec computes the HMAC digest
+       -> TenantApiKeyRepository loads credential metadata using JDBC
+  -> TenantPrincipal is placed in Spring Security's request context
+  -> TenantController returns that tenant's identity
+```
+
+`TenantAuthenticationService` implements Spring Security's `AuthenticationManager`,
+so Spring Boot backs off from creating its default username/password user.
+`SecurityConfiguration` registers the filter inside the security chain exactly
+once; the filter is deliberately not a Spring component or servlet-filter bean.
+The authenticated token contains the principal and tenant role, with no secret.
+The security context is cleared when the request finishes.
+
+For local creation, `TenantKeyCommand` calls `TenantApiKeyProvisioningService`,
+which generates metadata and a secret through the codec, then inserts the metadata
+through the repository. The repository remains JDBC, and no core model becomes a
+JPA entity. Future verification controllers should use
+`@AuthenticationPrincipal TenantPrincipal` and pass `principal.tenantId()` to the
+core service; their request bodies must not choose the tenant.
 
 ## Transaction behavior
 
@@ -99,8 +286,18 @@ exact Instants supplied to them; database round trips use PostgreSQL precision.
 
 ## Scope
 
-The persistence code compiles, but database migration and runtime behavior must be
-verified against your running database. No automated tests were added or run.
-SearchAPI retrieval, service bean configuration with HMAC keys, authentication,
-and verification controllers remain separate work. Starting this server does not
-yet provide a usable verification HTTP API.
+The core workflows, JDBC storage, SearchAPI provider, service wiring, and tenant
+authentication are implemented. The identity endpoint is available for manually
+checking authentication. Verification HTTP controllers, request DTOs, public API
+error mapping, request rate limits, and Docker packaging remain future work.
+
+This branch was packaged with test compilation and execution skipped. No automated
+tests were added or run, and no live provider calls were made.
+
+Local runtime checks on 2026-10-13 confirmed successful Flyway migrations through
+V3, aggregate health returning HTTP 200, and the identity endpoint returning the
+correct tenant and credential IDs with HTTP 200. Missing credentials, an altered
+secret, and a revoked credential returned HTTP 401. Both local credential creation
+and revocation succeeded, and revocation took effect without restarting the server.
+These checks cover the authentication flow; verification HTTP endpoints remain
+future work.
