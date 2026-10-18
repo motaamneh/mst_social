@@ -202,26 +202,44 @@ public final class VerificationRequest {
 
 
     /** A detached persistence value. It does not perform lifecycle transitions. */
-    public record Snapshot(
-            UUID id,
-            UUID tenantId,
-            String subjectId,
-            Platform platform,
-            String normalizedHandle,
-            byte[] codeDigest,
-            String codeKeyVersion,
-            Instant createdAt,
-            Instant expiresAt,
-            int maxFailedAttempts,
-            VerificationStatus status,
-            int failedAttempts,
-            Instant verifiedAt,
-            Instant canceledAt,
-            long version,
-            UUID verificationLeaseId,
-            Instant leaseExpiresAt
-    ) {
-        public Snapshot {
+    public static final class Snapshot {
+        private final UUID id;
+        private final UUID tenantId;
+        private final String subjectId;
+        private final Platform platform;
+        private final String normalizedHandle;
+        private final byte[] codeDigest;
+        private final String codeKeyVersion;
+        private final Instant createdAt;
+        private final Instant expiresAt;
+        private final int maxFailedAttempts;
+        private final VerificationStatus status;
+        private final int failedAttempts;
+        private final Instant verifiedAt;
+        private final Instant canceledAt;
+        private final long version;
+        private final UUID verificationLeaseId;
+        private final Instant leaseExpiresAt;
+
+        public Snapshot(
+                UUID id,
+                UUID tenantId,
+                String subjectId,
+                Platform platform,
+                String normalizedHandle,
+                byte[] codeDigest,
+                String codeKeyVersion,
+                Instant createdAt,
+                Instant expiresAt,
+                int maxFailedAttempts,
+                VerificationStatus status,
+                int failedAttempts,
+                Instant verifiedAt,
+                Instant canceledAt,
+                long version,
+                UUID verificationLeaseId,
+                Instant leaseExpiresAt
+        ) {
             Objects.requireNonNull(id, "id must not be null");
             Objects.requireNonNull(tenantId, "tenantId must not be null");
             requireNonBlank(subjectId, "subjectId");
@@ -259,9 +277,25 @@ public final class VerificationRequest {
             } else if (verificationLeaseId != null || leaseExpiresAt != null) {
                 throw new IllegalArgumentException("Only verifying requests may retain a lease");
             }
+            this.id = id;
+            this.tenantId = tenantId;
+            this.subjectId = subjectId;
+            this.platform = platform;
+            this.normalizedHandle = normalizedHandle;
+            this.codeDigest = codeDigest;
+            this.codeKeyVersion = codeKeyVersion;
+            this.createdAt = createdAt;
+            this.expiresAt = expiresAt;
+            this.maxFailedAttempts = maxFailedAttempts;
+            this.status = status;
+            this.failedAttempts = failedAttempts;
+            this.verifiedAt = verifiedAt;
+            this.canceledAt = canceledAt;
+            this.version = version;
+            this.verificationLeaseId = verificationLeaseId;
+            this.leaseExpiresAt = leaseExpiresAt;
         }
 
-        @Override
         public byte[] codeDigest() {
             return codeDigest.clone();
         }
@@ -269,6 +303,102 @@ public final class VerificationRequest {
         @Override
         public String toString() {
             return "VerificationRequest.Snapshot[redacted]";
+        }
+
+        public UUID id() {
+            return id;
+        }
+
+        public UUID tenantId() {
+            return tenantId;
+        }
+
+        public String subjectId() {
+            return subjectId;
+        }
+
+        public Platform platform() {
+            return platform;
+        }
+
+        public String normalizedHandle() {
+            return normalizedHandle;
+        }
+
+        public String codeKeyVersion() {
+            return codeKeyVersion;
+        }
+
+        public Instant createdAt() {
+            return createdAt;
+        }
+
+        public Instant expiresAt() {
+            return expiresAt;
+        }
+
+        public int maxFailedAttempts() {
+            return maxFailedAttempts;
+        }
+
+        public VerificationStatus status() {
+            return status;
+        }
+
+        public int failedAttempts() {
+            return failedAttempts;
+        }
+
+        public Instant verifiedAt() {
+            return verifiedAt;
+        }
+
+        public Instant canceledAt() {
+            return canceledAt;
+        }
+
+        public long version() {
+            return version;
+        }
+
+        public UUID verificationLeaseId() {
+            return verificationLeaseId;
+        }
+
+        public Instant leaseExpiresAt() {
+            return leaseExpiresAt;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Snapshot other)) {
+                return false;
+            }
+            return Objects.equals(id, other.id)
+                    && Objects.equals(tenantId, other.tenantId)
+                    && Objects.equals(subjectId, other.subjectId)
+                    && Objects.equals(platform, other.platform)
+                    && Objects.equals(normalizedHandle, other.normalizedHandle)
+                    && Objects.equals(codeDigest, other.codeDigest)
+                    && Objects.equals(codeKeyVersion, other.codeKeyVersion)
+                    && Objects.equals(createdAt, other.createdAt)
+                    && Objects.equals(expiresAt, other.expiresAt)
+                    && Objects.equals(maxFailedAttempts, other.maxFailedAttempts)
+                    && Objects.equals(status, other.status)
+                    && Objects.equals(failedAttempts, other.failedAttempts)
+                    && Objects.equals(verifiedAt, other.verifiedAt)
+                    && Objects.equals(canceledAt, other.canceledAt)
+                    && Objects.equals(version, other.version)
+                    && Objects.equals(verificationLeaseId, other.verificationLeaseId)
+                    && Objects.equals(leaseExpiresAt, other.leaseExpiresAt);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, tenantId, subjectId, platform, normalizedHandle, codeDigest, codeKeyVersion, createdAt, expiresAt, maxFailedAttempts, status, failedAttempts, verifiedAt, canceledAt, version, verificationLeaseId, leaseExpiresAt);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.motaamneh.mstsocial.server.admin;
 
+import java.util.Objects;
+
 import com.motaamneh.mstsocial.server.config.TenantApiKeyProperties;
 import com.motaamneh.mstsocial.server.persistence.TenantApiKeyRepository;
 import com.motaamneh.mstsocial.server.security.TenantApiKeyCodec;
@@ -147,7 +149,65 @@ public final class TenantKeyCommand {
                 """);
     }
 
-    private record Options(boolean create, UUID tenantId, String name, Instant expiresAt, UUID credentialId) {
+    private static final class Options {
+        private final boolean create;
+        private final UUID tenantId;
+        private final String name;
+        private final Instant expiresAt;
+        private final UUID credentialId;
+
+        private Options(boolean create, UUID tenantId, String name, Instant expiresAt, UUID credentialId) {
+            this.create = create;
+            this.tenantId = tenantId;
+            this.name = name;
+            this.expiresAt = expiresAt;
+            this.credentialId = credentialId;
+        }
+
+        public boolean create() {
+            return create;
+        }
+
+        public UUID tenantId() {
+            return tenantId;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public Instant expiresAt() {
+            return expiresAt;
+        }
+
+        public UUID credentialId() {
+            return credentialId;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Options other)) {
+                return false;
+            }
+            return Objects.equals(create, other.create)
+                    && Objects.equals(tenantId, other.tenantId)
+                    && Objects.equals(name, other.name)
+                    && Objects.equals(expiresAt, other.expiresAt)
+                    && Objects.equals(credentialId, other.credentialId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(create, tenantId, name, expiresAt, credentialId);
+        }
+
+        @Override
+        public String toString() {
+            return "Options[create=" + create + ", tenantId=" + tenantId + ", name=" + name + ", expiresAt=" + expiresAt + ", credentialId=" + credentialId + "]";
+        }
     }
 
     // Deliberately no @Configuration/@Component: the web application's component scan must not load this.

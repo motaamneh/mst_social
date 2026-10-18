@@ -1,8 +1,14 @@
 # MST Social server
 
 The server wires the plain Java verification service to SearchAPI and PostgreSQL.
-It authenticates application backends with tenant API keys. This branch includes
-an identity endpoint; the verification HTTP controllers are the next step.
+It authenticates application backends with tenant API keys and exposes verification
+and verified-account endpoints. See the [API walkthrough](VERIFICATION_API.md) and
+[OpenAPI contract](openapi.yaml) for request bodies, responses, and error codes.
+
+**First time running the API?** Follow [Start to finish: tenant setup and Postman](POSTMAN_GUIDE.md).
+It explains how to get your tenant ID and API key, and includes a ready-to-import
+[collection](postman/MST-Social.postman_collection.json) and
+[environment template](postman/MST-Social-Local.postman_environment.json).
 
 ## Connect your existing database
 
@@ -105,8 +111,9 @@ server hash key. Authentication compares the stored and presented digests with
 ### 1. Build and migrate
 
 Set the environment variables above, build the JAR, and start the server with the
-commands in the setup section. Flyway applies V3 automatically. Keep the existing
-V1/V2 migrations unchanged. The local administration command also initializes
+commands in the setup section. Flyway applies all pending migrations automatically,
+including V3 for credentials and V4 for API rate limits. Keep previously applied
+migrations unchanged. The local administration command also initializes
 Flyway before performing its operation.
 
 ### 2. Choose a tenant
@@ -233,7 +240,9 @@ HTTP request with Authorization: Bearer ...
        -> TenantApiKeyCodec computes the HMAC digest
        -> TenantApiKeyRepository loads credential metadata using JDBC
   -> TenantPrincipal is placed in Spring Security's request context
-  -> TenantController returns that tenant's identity
+  -> Controller reads the authenticated TenantPrincipal
+       -> TenantController returns that tenant's identity, or
+       -> VerificationController / VerifiedAccountController calls the core service
 ```
 
 `TenantAuthenticationService` implements Spring Security's `AuthenticationManager`,
@@ -246,9 +255,9 @@ The security context is cleared when the request finishes.
 For local creation, `TenantKeyCommand` calls `TenantApiKeyProvisioningService`,
 which generates metadata and a secret through the codec, then inserts the metadata
 through the repository. The repository remains JDBC, and no core model becomes a
-JPA entity. Future verification controllers should use
+JPA entity. Verification controllers use
 `@AuthenticationPrincipal TenantPrincipal` and pass `principal.tenantId()` to the
-core service; their request bodies must not choose the tenant.
+core service; their request bodies cannot choose the tenant.
 
 ## Transaction behavior
 
@@ -284,12 +293,29 @@ The adapter preserves historical account links after revocation or expiry.
 PostgreSQL stores timestamp precision to microseconds. Java snapshots preserve the
 exact Instants supplied to them; database round trips use PostgreSQL precision.
 
+## HTTP DTO conventions
+
+Only HTTP response DTOs in `web/dto/response` may be records. Request DTOs,
+domain values, configuration, persistence snapshots, and internal data holders
+must be ordinary Java classes. Immutable classes retain their existing accessor
+names, such as `tenantId()` and `requestId()`, to preserve callers.
+Server request classes can use Lombok getters, setters, and a no-argument
+constructor, with Jakarta validation annotations on their fields. Controllers
+must activate validation with `@Valid` and read request fields through getters
+such as `getSubjectId()`.
+
 ## Scope
 
 The core workflows, JDBC storage, SearchAPI provider, service wiring, and tenant
-authentication are implemented. The identity endpoint is available for manually
-checking authentication. Verification HTTP controllers, request DTOs, public API
-error mapping, request rate limits, and Docker packaging remain future work.
+authentication are implemented. The HTTP API supports creating, reading, verifying,
+and canceling requests and reading/revoking verified social accounts. It includes
+validated request classes, safe error responses, strict JSON parsing, and shared
+PostgreSQL rate limits through V4. The identity endpoint remains available for
+checking authentication.
+
+Docker packaging, durable creation-response replay, and edge/IP throttling remain
+future work. Do not send `Idempotency-Key`: mutations explicitly reject it until
+replay semantics are implemented. See the API guide for retry behavior and limits.
 
 This branch was packaged with test compilation and execution skipped. No automated
 tests were added or run, and no live provider calls were made.
@@ -299,5 +325,7 @@ V3, aggregate health returning HTTP 200, and the identity endpoint returning the
 correct tenant and credential IDs with HTTP 200. Missing credentials, an altered
 secret, and a revoked credential returned HTTP 401. Both local credential creation
 and revocation succeeded, and revocation took effect without restarting the server.
-These checks cover the authentication flow; verification HTTP endpoints remain
-future work.
+These historical checks cover authentication. The verification API branch builds
+with `./mvnw -B -o -Dmaven.test.skip=true package`. Its first local startup attempt
+on 2026-10-17 stopped because PostgreSQL was not listening on localhost:5432;
+runtime API checks require that database to be started.

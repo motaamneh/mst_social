@@ -36,4 +36,3 @@ build/
 # Local credentials
 .env
 .env.*
-.env.example

@@ -79,19 +79,56 @@ public final class TenantApiKeyCodec {
     }
 
     /** Returned only during provisioning. Never log or serialize this object. */
-    public record GeneratedCredential(TenantApiKey metadata, String credential) {
+    public static final class GeneratedCredential {
+        private final TenantApiKey metadata;
+        private final String credential;
+
+        public GeneratedCredential(TenantApiKey metadata, String credential) {
+            this.metadata = metadata;
+            this.credential = credential;
+        }
+
         @Override
         public String toString() {
             return "GeneratedCredential[id=" + metadata.getId() + ", credential=[REDACTED]]";
         }
-    }
 
-    record ParsedCredential(UUID id, byte[] digest) {
-        ParsedCredential {
-            digest = digest.clone();
+        public TenantApiKey metadata() {
+            return metadata;
+        }
+
+        public String credential() {
+            return credential;
         }
 
         @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof GeneratedCredential other)) {
+                return false;
+            }
+            return Objects.equals(metadata, other.metadata)
+                    && Objects.equals(credential, other.credential);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(metadata, credential);
+        }
+    }
+
+    static final class ParsedCredential {
+        private final UUID id;
+        private final byte[] digest;
+
+        ParsedCredential(UUID id, byte[] digest) {
+            digest = digest.clone();
+            this.id = id;
+            this.digest = digest;
+        }
+
         public byte[] digest() {
             return digest.clone();
         }
@@ -99,6 +136,27 @@ public final class TenantApiKeyCodec {
         @Override
         public String toString() {
             return "ParsedCredential[id=" + id + ", digest=[REDACTED]]";
+        }
+
+        public UUID id() {
+            return id;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof ParsedCredential other)) {
+                return false;
+            }
+            return Objects.equals(id, other.id)
+                    && Objects.equals(digest, other.digest);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, digest);
         }
     }
 }

@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: MST Social verification API
+  version: 0.0.1
+  description: |
+    Verify control of Instagram and TikTok accounts using codes placed in profile bios.
+    Tenant identity comes from a backend-only Bearer credential. The consuming
+    application authorizes its own users and their subject/resource IDs.
+    Mutations reject Idempotency-Key headers; creation-response replay is not supported.
+    Except for creation, mutation bodies must be empty (not even an empty JSON object).
+    See VERIFICATION_API.md for retry behavior, limits, and the complete walkthrough.
+servers:
+  - url: http://localhost:8080
+    description: Local development; use HTTPS outside localhost
+security:
+  - tenantKey: []
+tags:
+  - name: Tenant
+  - name: Verifications
+  - name: Social identities
+paths:
+  /api/v1/tenant:
+    get:
+      tags: [Tenant]
+      operationId: getTenantIdentity
+      summary: Read the authenticated tenant and credential IDs
+      responses:
+        '200':
+          description: Authenticated identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantIdentityResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/verifications:
+    post:
+      tags: [Verifications]
+      operationId: createVerification
+      summary: Create a verification and return its code once
+      description: |
+        Does not call the provider. Returns 409 for a duplicate active request,
+        422 for a known unsupported platform, and 429 for active-request or rate limits.
+        Never log the code. GET cannot recover it if this response is lost.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVerificationRequest'
+      responses:
+        '201':
+          description: Created; code is returned only in this response
+          headers:
+            Location:
+              description: Relative URI of the created verification
+              schema: {type: string, format: uri-reference}
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationCreatedResponse'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/verifications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Verifications]
+      operationId: getVerification
+      summary: Read request status without a provider lookup
+      description: Expired and terminal requests remain readable. The code is never returned.
+      responses:
+        '200':
+          $ref: '#/components/responses/Verification'
+        '404':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Verifications]
+      operationId: cancelVerification
+      summary: Cancel a pending or in-progress request
+      description: |
+        Requires an empty body. Returns terminal requests unchanged. Does not revoke
+        a verified account; use the social-identity revocation endpoint for that.
+      responses:
+        '200':
+          $ref: '#/components/responses/Verification'
+        '404':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/verifications/{id}/verify:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [Verifications]
+      operationId: verifyProfile
+      summary: Verify the code using provider evidence
+      description: |
+        Requires an empty body. One eligible attempt makes one provider call;
+        there is no automatic retry. Private profiles may verify with a usable bio.
+        Failures 1-9 without the code leave the request PENDING; failure 10 locks it.
+        Provider failures consume no mismatch attempts. An already successful request
+        returns its original association without fetching or extending validity.
+      responses:
+        '200':
+          description: VERIFIED or ALREADY_VERIFIED; check account.active for current validity
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationAttemptResponse'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          description: IN_PROGRESS, STALE_ATTEMPT, ACCOUNT_ALREADY_LINKED, CANCELED, or LOCKED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '422':
+          description: CODE_NOT_FOUND or provider profile unavailable/not found/unsupported
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          description: Provider authentication failed or returned invalid data
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '504':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/social-identities/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Social identities]
+      operationId: getVerifiedAccount
+      summary: Read an account association and its current active flag
+      description: Expired and revoked associations remain readable.
+      responses:
+        '200':
+          $ref: '#/components/responses/VerifiedAccount'
+        '404':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Social identities]
+      operationId: revokeVerifiedAccount
+      summary: Revoke an account association while retaining its history
+      description: Requires an empty body. Repeated revocation preserves its original timestamp.
+      responses:
+        '200':
+          $ref: '#/components/responses/VerifiedAccount'
+        '404':
+          $ref: '#/components/responses/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    tenantKey:
+      type: http
+      scheme: bearer
+      bearerFormat: mst_api_<credential-uuid>.<secret>
+      description: Provisioned tenant API key; send only from your backend
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: Resource UUID within the authenticated tenant
+      schema: {type: string, format: uuid}
+  headers:
+    NoStore:
+      description: Prevent caching of private verification data
+      schema: {type: string, const: no-store}
+    RetryAfter:
+      description: Present for tenant rate limits or a provider-supplied retry delay, in seconds
+      schema: {type: integer, minimum: 1}
+  responses:
+    Problem:
+      description: |
+        Safe error response. Missing/invalid credentials return 401, authentication
+        storage unavailability returns 503. Missing resources and resources owned
+        by another tenant return the same 404. Rate limits return 429 with Retry-After.
+        Unexpected failures return 500 without exception details.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        WWW-Authenticate:
+          description: Present for 401 responses
+          schema: {type: string, example: 'Bearer realm="mst-social"'}
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    Verification:
+      description: Current verification status; no plaintext code or stored digest
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VerificationResponse'
+    VerifiedAccount:
+      description: Account association with activity calculated at read time
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VerifiedAccountResponse'
+  schemas:
+    Platform:
+      type: string
+      enum: [INSTAGRAM, TIKTOK, X, FACEBOOK]
+      description: Only INSTAGRAM and TIKTOK currently have a provider
+    CreateVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [subjectId, platform, handle]
+      properties:
+        subjectId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Nonblank application user ID; ASCII control characters are forbidden
+          example: user-123
+        platform:
+          $ref: '#/components/schemas/Platform'
+        handle:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Nonblank handle, optionally prefixed with @; platform validation follows normalization
+          example: '@your_username'
+    TenantIdentityResponse:
+      type: object
+      required: [tenantId, credentialId]
+      properties:
+        tenantId: {type: string, format: uuid}
+        credentialId: {type: string, format: uuid}
+    VerificationCreatedResponse:
+      type: object
+      required: [requestId, code, expiresAt, instructions]
+      properties:
+        requestId: {type: string, format: uuid}
+        code:
+          type: string
+          description: Secret verification code returned once; never log this response
+        expiresAt: {type: string, format: date-time}
+        instructions: {type: string}
+    VerificationResponse:
+      type: object
+      required: [requestId, subjectId, platform, normalizedHandle, status, failedAttempts, maxFailedAttempts, createdAt, expiresAt, verifiedAt, canceledAt]
+      properties:
+        requestId: {type: string, format: uuid}
+        subjectId: {type: string}
+        platform:
+          $ref: '#/components/schemas/Platform'
+        normalizedHandle: {type: string}
+        status:
+          type: string
+          enum: [PENDING, VERIFYING, VERIFIED, EXPIRED, LOCKED, CANCELED]
+        failedAttempts: {type: integer, minimum: 0}
+        maxFailedAttempts: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        verifiedAt: {type: [string, 'null'], format: date-time}
+        canceledAt: {type: [string, 'null'], format: date-time}
+    VerifiedAccountResponse:
+      type: object
+      required: [accountId, subjectId, platform, canonicalHandle, providerAccountId, evidenceProvider, verifiedAt, validUntil, revokedAt, active]
+      properties:
+        accountId: {type: string, format: uuid}
+        subjectId: {type: string}
+        platform:
+          $ref: '#/components/schemas/Platform'
+        canonicalHandle: {type: string}
+        providerAccountId: {type: [string, 'null']}
+        evidenceProvider: {type: string}
+        verifiedAt: {type: string, format: date-time}
+        validUntil: {type: string, format: date-time}
+        revokedAt: {type: [string, 'null'], format: date-time}
+        active: {type: boolean}
+    VerificationAttemptResponse:
+      type: object
+      required: [outcome, verification, account]
+      properties:
+        outcome: {type: string, enum: [VERIFIED, ALREADY_VERIFIED]}
+        verification:
+          $ref: '#/components/schemas/VerificationResponse'
+        account:
+          $ref: '#/components/schemas/VerifiedAccountResponse'
+    ApiErrorResponse:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: {type: string, format: uri, const: 'about:blank'}
+        title: {type: string}
+        status: {type: integer, minimum: 400, maximum: 599}
+        code:
+          type: string
+          description: Stable code for programmatic handling; see VERIFICATION_API.md
+        detail: {type: string}
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldErrorResponse'
+        verification:
+          $ref: '#/components/schemas/VerificationResponse'
+        providerFailure:
+          $ref: '#/components/schemas/ProviderFailureResponse'
+    FieldErrorResponse:
+      type: object
+      required: [field, message]
+      properties:
+        field: {type: string}
+        message: {type: string}
+    ProviderFailureResponse:
+      type: object
+      required: [reason, retryable]
+      properties:
+        reason:
+          type: string
+          enum: [PROFILE_NOT_FOUND, PROFILE_UNAVAILABLE, UNSUPPORTED_PLATFORM, PROVIDER_TIMEOUT, PROVIDER_AUTHENTICATION_FAILED, INVALID_PROVIDER_RESPONSE, PROVIDER_RATE_LIMITED, PROVIDER_ERROR]
+        retryable: {type: boolean}
+        retryAfterSeconds: {type: integer, minimum: 1, maximum: 86400}

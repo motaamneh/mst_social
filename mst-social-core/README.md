@@ -93,7 +93,7 @@ For example, `normalize(Platform.INSTAGRAM, "  @Example.User  ")` returns
 `"https://instagram.com/example"` are rejected. A domain-shaped string that also
 fits the handle grammar is treated only as a handle, never as an outbound host.
 
-Invalid handles throw `IllegalArgumentException`; null arguments throw
+Invalid handles throw `InvalidHandleException`, a subclass of `IllegalArgumentException`; null arguments throw
 `NullPointerException` (unsupported platforms are rejected before input validation).
 Error messages do not include the submitted handle. Apply the same policy to
 the requested and provider-returned usernames before comparing them. Providers
@@ -104,9 +104,9 @@ must still construct URLs from fixed, allowlisted hosts and encode parameters.
 Callers supply timestamps from an injected application `Clock`. These mutable
 objects are not thread-safe; their version counters do not implement database
 locking. The service uses the storage transaction contract described below.
-The server module provides a PostgreSQL storage adapter and Flyway migration.
-Provider HTTP retrieval and server authentication remain future work. X and Facebook remain
-identifiers awaiting support; Instagram and TikTok are the planned integrations.
+The server module provides PostgreSQL storage, Flyway migrations, tenant authentication,
+and HTTP controllers. The SearchAPI module retrieves Instagram and TikTok profiles.
+X and Facebook remain identifiers awaiting support.
 
 ## Step 6: storage contract and leases
 
@@ -138,7 +138,9 @@ expired lease. A late response returns `STALE_ATTEMPT` without changing the requ
 
 ## Step 7: service inputs and outputs
 
-The `service` package contains ordinary Java records:
+The `service` package contains immutable ordinary Java classes. Their existing
+accessor names, such as `requestId()` and `subjectId()`, are retained. Records are
+reserved for the server's HTTP response DTOs; the core has no record declarations.
 
 | Type | Purpose |
 | --- | --- |
@@ -227,16 +229,17 @@ var created = service.createVerification(
 var result = service.verify(authenticatedTenantId, created.requestId());
 ```
 
-The server's `PostgresVerificationStore` implements the storage port. Running this
-example also requires a configured `ProfileProvider`; SearchAPI HTTP integration
-and controllers remain future work. See the [database setup guide](../mst-social-server/README.md).
+The server's `PostgresVerificationStore` implements the storage port and its
+`VerificationConfiguration` supplies the configured SearchAPI provider. See the
+[server setup guide](../mst-social-server/README.md) and
+[HTTP API guide](../mst-social-server/VERIFICATION_API.md).
 
 ## Restoring saved models
 
 Both domain models provide `snapshot()` and a static `restore(snapshot)` factory.
-Each nested `Snapshot` record belongs to one model: requests contain attempts,
+Each nested immutable `Snapshot` class belongs to one model: requests contain attempts,
 digests, and leases; accounts contain validity and revocation. Their distinct
-fields and validation rules are not combined into a generic record.
+fields and validation rules are not combined into a generic data holder.
 
 Normal constructors create new state. Restoration preserves the saved ID, status,
 version, and deadlines without replaying transitions or recalculating validity

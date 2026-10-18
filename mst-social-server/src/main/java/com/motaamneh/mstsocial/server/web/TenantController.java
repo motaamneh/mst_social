@@ -8,17 +8,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
+import com.motaamneh.mstsocial.server.web.dto.response.TenantIdentityResponse;
 
 @RestController
 @RequestMapping("/api/v1/tenant")
 public class TenantController {
     @GetMapping
-    public ResponseEntity<TenantIdentity> currentTenant(@AuthenticationPrincipal TenantPrincipal principal) {
+    public ResponseEntity<TenantIdentityResponse> currentTenant(@AuthenticationPrincipal TenantPrincipal principal) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(new TenantIdentity(principal.tenantId(), principal.credentialId()));
-    }
-
-    public record TenantIdentity(UUID tenantId, UUID credentialId) {
+                .body(new TenantIdentityResponse(principal.tenantId(), principal.credentialId()));
     }
 }

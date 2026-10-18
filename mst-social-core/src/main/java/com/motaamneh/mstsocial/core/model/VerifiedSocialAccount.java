@@ -74,20 +74,32 @@ public final class VerifiedSocialAccount {
 
 
     /** A detached persistence value. It does not perform lifecycle transitions. */
-    public record Snapshot(
-            UUID id,
-            UUID tenantId,
-            String subjectId,
-            Platform platform,
-            String canonicalHandle,
-            String providerAccountId,
-            String evidenceProvider,
-            Instant verifiedAt,
-            Instant validUntil,
-            Instant revokedAt,
-            long version
-    ) {
-        public Snapshot {
+    public static final class Snapshot {
+        private final UUID id;
+        private final UUID tenantId;
+        private final String subjectId;
+        private final Platform platform;
+        private final String canonicalHandle;
+        private final String providerAccountId;
+        private final String evidenceProvider;
+        private final Instant verifiedAt;
+        private final Instant validUntil;
+        private final Instant revokedAt;
+        private final long version;
+
+        public Snapshot(
+                UUID id,
+                UUID tenantId,
+                String subjectId,
+                Platform platform,
+                String canonicalHandle,
+                String providerAccountId,
+                String evidenceProvider,
+                Instant verifiedAt,
+                Instant validUntil,
+                Instant revokedAt,
+                long version
+        ) {
             Objects.requireNonNull(id, "id must not be null");
             Objects.requireNonNull(tenantId, "tenantId must not be null");
             requireNonBlank(subjectId, "subjectId");
@@ -103,11 +115,92 @@ public final class VerifiedSocialAccount {
                     || (revokedAt != null && revokedAt.isBefore(verifiedAt))) {
                 throw new IllegalArgumentException("Invalid saved account state");
             }
+            this.id = id;
+            this.tenantId = tenantId;
+            this.subjectId = subjectId;
+            this.platform = platform;
+            this.canonicalHandle = canonicalHandle;
+            this.providerAccountId = providerAccountId;
+            this.evidenceProvider = evidenceProvider;
+            this.verifiedAt = verifiedAt;
+            this.validUntil = validUntil;
+            this.revokedAt = revokedAt;
+            this.version = version;
         }
 
         @Override
         public String toString() {
             return "VerifiedSocialAccount.Snapshot[redacted]";
+        }
+
+        public UUID id() {
+            return id;
+        }
+
+        public UUID tenantId() {
+            return tenantId;
+        }
+
+        public String subjectId() {
+            return subjectId;
+        }
+
+        public Platform platform() {
+            return platform;
+        }
+
+        public String canonicalHandle() {
+            return canonicalHandle;
+        }
+
+        public String providerAccountId() {
+            return providerAccountId;
+        }
+
+        public String evidenceProvider() {
+            return evidenceProvider;
+        }
+
+        public Instant verifiedAt() {
+            return verifiedAt;
+        }
+
+        public Instant validUntil() {
+            return validUntil;
+        }
+
+        public Instant revokedAt() {
+            return revokedAt;
+        }
+
+        public long version() {
+            return version;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Snapshot other)) {
+                return false;
+            }
+            return Objects.equals(id, other.id)
+                    && Objects.equals(tenantId, other.tenantId)
+                    && Objects.equals(subjectId, other.subjectId)
+                    && Objects.equals(platform, other.platform)
+                    && Objects.equals(canonicalHandle, other.canonicalHandle)
+                    && Objects.equals(providerAccountId, other.providerAccountId)
+                    && Objects.equals(evidenceProvider, other.evidenceProvider)
+                    && Objects.equals(verifiedAt, other.verifiedAt)
+                    && Objects.equals(validUntil, other.validUntil)
+                    && Objects.equals(revokedAt, other.revokedAt)
+                    && Objects.equals(version, other.version);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, tenantId, subjectId, platform, canonicalHandle, providerAccountId, evidenceProvider, verifiedAt, validUntil, revokedAt, version);
         }
     }
 

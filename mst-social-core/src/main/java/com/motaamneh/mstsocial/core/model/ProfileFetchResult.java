@@ -7,11 +7,37 @@ import java.util.Objects;
 public sealed interface ProfileFetchResult
         permits ProfileFetchResult.Found,
         ProfileFetchResult.Failed {
-    record Found(
-            ProfileObservation observation
-    ) implements ProfileFetchResult {
-        public Found {
+    static final class Found implements ProfileFetchResult {
+        private final ProfileObservation observation;
+
+        public Found(ProfileObservation observation) {
             Objects.requireNonNull(observation, "observation must not be null");
+            this.observation = observation;
+        }
+
+        public ProfileObservation observation() {
+            return observation;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Found other)) {
+                return false;
+            }
+            return Objects.equals(observation, other.observation);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(observation);
+        }
+
+        @Override
+        public String toString() {
+            return "Found[observation=" + observation + "]";
         }
     }
 
@@ -20,12 +46,12 @@ public sealed interface ProfileFetchResult
      * must be positive and refer to a retryable failure.
      * retryable does not automatically trigger a retry.
      */
-    record Failed(
-            ProfileFailureReason reason,
-            boolean retryable,
-            Duration retryAfter
-    ) implements ProfileFetchResult {
-        public Failed {
+    static final class Failed implements ProfileFetchResult {
+        private final ProfileFailureReason reason;
+        private final boolean retryable;
+        private final Duration retryAfter;
+
+        public Failed(ProfileFailureReason reason, boolean retryable, Duration retryAfter) {
             Objects.requireNonNull(reason, "reason must not be null");
             if (retryAfter != null) {
                 if (retryAfter.isNegative() || retryAfter.isZero()) {
@@ -35,6 +61,44 @@ public sealed interface ProfileFetchResult
                     throw new IllegalArgumentException("retryAfter requires a retryable failure");
                 }
             }
+            this.reason = reason;
+            this.retryable = retryable;
+            this.retryAfter = retryAfter;
+        }
+
+        public ProfileFailureReason reason() {
+            return reason;
+        }
+
+        public boolean retryable() {
+            return retryable;
+        }
+
+        public Duration retryAfter() {
+            return retryAfter;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Failed other)) {
+                return false;
+            }
+            return Objects.equals(reason, other.reason)
+                    && Objects.equals(retryable, other.retryable)
+                    && Objects.equals(retryAfter, other.retryAfter);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(reason, retryable, retryAfter);
+        }
+
+        @Override
+        public String toString() {
+            return "Failed[reason=" + reason + ", retryable=" + retryable + ", retryAfter=" + retryAfter + "]";
         }
     }
 }
