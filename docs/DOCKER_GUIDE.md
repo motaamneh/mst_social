@@ -437,6 +437,25 @@ An eligible Verify call uses SearchAPI usage. Docker startup, health checks, ten
 creation, key provisioning, request creation, and status reads do not fetch profiles.
 The collection's cancellation and revocation requests are optional state changes.
 
+### Use Swagger UI instead of Postman
+
+Compose enables interactive docs by default at
+<http://localhost:8080/swagger-ui.html> (adjust the port if needed).
+Click **Authorize** and paste your tenant key without the `Bearer ` prefix.
+Follow the [Swagger walkthrough](SWAGGER_GUIDE.md) to create, inspect, verify,
+and revoke an association. Execute sends real API requests; eligible verification
+calls consume provider usage.
+
+Set `MST_API_DOCS_ENABLED=false` in `.env.docker` to disable the docs, then apply it:
+
+```sh
+docker compose --env-file .env.docker up -d --wait app
+```
+
+The switch controls the UI and OpenAPI JSON/YAML routes. It does not remove
+authentication from the API. Use `up` to apply environment changes; `restart` alone
+keeps the old container environment.
+
 ## 8. Daily commands and what they mean
 
 | Task | Command |

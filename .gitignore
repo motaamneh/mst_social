@@ -36,3 +36,5 @@ build/
 # Local credentials
 .env
 .env.*
+# Publish the setup template; actual local environment files remain ignored.
+!/.env.example

@@ -11,7 +11,15 @@
     <artifactId>mst-social-server</artifactId>
     <name>mst-social-server</name>
     <description>Spring Boot HTTP service and PostgreSQL persistence for mst_social</description>
+    <properties>
+        <springdoc.version>3.1.1</springdoc.version>
+    </properties>
     <dependencies>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.motaamneh</groupId>
             <artifactId>mst-social-core</artifactId>

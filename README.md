@@ -27,6 +27,15 @@ Follow the [Docker beginner guide](docs/DOCKER_GUIDE.md) for a step-by-step expl
 of the Dockerfile, Compose, secrets, tenant creation, API keys, and Postman. The image
 is built locally as `mst-social:local`; a published registry image is not yet provided.
 
+## Interactive API documentation
+
+Docker Compose enables Swagger UI at <http://localhost:8080/swagger-ui.html>.
+OpenAPI is available at `/v3/api-docs` (JSON) and `/v3/api-docs.yaml` (YAML).
+For IntelliJ or JAR runs, set `MST_API_DOCS_ENABLED=true` and restart.
+Use **Authorize** with a tenant API key to execute API requests.
+Follow the [Swagger walkthrough](docs/SWAGGER_GUIDE.md) for setup, authentication,
+verification, error handling, and disabling the docs.
+
 ## Modules
 
 | Module | Responsibility | Artifact |
