@@ -3,6 +3,10 @@
 This guide takes you from an empty `mst_social_db` database to a verified Instagram
 or TikTok account. It matches the current server implementation.
 
+**Using Docker?** First follow the [Docker guide](../docs/DOCKER_GUIDE.md) through
+tenant/API-key creation, then continue here at step 5. Docker has its own PostgreSQL
+database; it does not automatically reuse tenants or credentials from your IDE setup.
+
 Import these two files when you reach step 5:
 
 - [Postman collection](postman/MST-Social.postman_collection.json)

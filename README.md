@@ -2,7 +2,30 @@
 
 An open-source Java project for verifying control of social accounts through temporary profile-bio verification codes.
 
-The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot verification API with PostgreSQL storage and tenant API-key authentication. Docker packaging remains a future step.
+The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot verification API with PostgreSQL storage and tenant API-key authentication. Run it locally with Docker Compose or build the Java artifacts directly.
+
+## Run locally with Docker
+
+With Docker Desktop running, create your local configuration from the template:
+
+```sh
+cp -n docker.env.example .env.docker
+chmod 600 .env.docker
+```
+
+Fill the blank secrets in `.env.docker`, then start the API and PostgreSQL:
+
+```sh
+docker compose --env-file .env.docker up --build -d --wait
+```
+
+The API is available at `http://localhost:8080`; PostgreSQL stays on the internal
+Compose network and stores its data in a named volume. Flyway creates the tables.
+No local Java or Maven installation is needed for this path. The build skips tests.
+
+Follow the [Docker beginner guide](docs/DOCKER_GUIDE.md) for a step-by-step explanation
+of the Dockerfile, Compose, secrets, tenant creation, API keys, and Postman. The image
+is built locally as `mst-social:local`; a published registry image is not yet provided.
 
 ## Modules
 
