@@ -1,0 +1,50 @@
+name: mst-social
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: mst_social_db
+      POSTGRES_USER: mst_social
+      POSTGRES_PASSWORD: ${MST_DB_PASSWORD:?Set MST_DB_PASSWORD in .env.docker}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Database traffic stays on the Compose network; no host port is published.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    image: mst-social:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MST_DB_URL: jdbc:postgresql://db:5432/mst_social_db
+      MST_DB_USERNAME: mst_social
+      MST_DB_PASSWORD: ${MST_DB_PASSWORD:?Set MST_DB_PASSWORD in .env.docker}
+      SEARCHAPI_API_KEY: ${SEARCHAPI_API_KEY:?Set SEARCHAPI_API_KEY in .env.docker}
+      MST_VERIFICATION_KEY_V1: ${MST_VERIFICATION_KEY_V1:?Set MST_VERIFICATION_KEY_V1 in .env.docker}
+      MST_TENANT_API_KEY_HASH_KEY: ${MST_TENANT_API_KEY_HASH_KEY:?Set MST_TENANT_API_KEY_HASH_KEY in .env.docker}
+    ports:
+      - "127.0.0.1:${MST_HTTP_PORT:-8080}:8080"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

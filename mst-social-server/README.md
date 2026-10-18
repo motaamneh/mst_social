@@ -10,6 +10,11 @@ It explains how to get your tenant ID and API key, and includes a ready-to-impor
 [collection](postman/MST-Social.postman_collection.json) and
 [environment template](postman/MST-Social-Local.postman_environment.json).
 
+**Running with Docker?** Use the [Docker beginner guide](../docs/DOCKER_GUIDE.md).
+It starts the API and a separate PostgreSQL database, applies the same migrations,
+and shows how to run tenant provisioning commands inside the containers. The setup
+below is for a local JVM/IDE connected to an existing database.
+
 ## Connect your existing database
 
 The application defaults to `jdbc:postgresql://localhost:5432/mst_social_db`.
@@ -313,8 +318,9 @@ validated request classes, safe error responses, strict JSON parsing, and shared
 PostgreSQL rate limits through V4. The identity endpoint remains available for
 checking authentication.
 
-Docker packaging, durable creation-response replay, and edge/IP throttling remain
-future work. Do not send `Idempotency-Key`: mutations explicitly reject it until
+Docker packaging and local Compose startup are available through the root Dockerfile
+and Compose file. Published registry images, durable creation-response replay, and
+edge/IP throttling remain future work. Do not send `Idempotency-Key`: mutations explicitly reject it until
 replay semantics are implemented. See the API guide for retry behavior and limits.
 
 This branch was packaged with test compilation and execution skipped. No automated

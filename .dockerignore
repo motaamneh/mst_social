@@ -1,0 +1,32 @@
+# Only send the files needed for a Maven production build to Docker.
+# Local environment files, Git history, IDE files, and target/ stay outside it.
+**
+!pom.xml
+!mvnw
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+!mst-social-core/
+!mst-social-core/pom.xml
+!mst-social-core/src/
+!mst-social-core/src/main/
+!mst-social-core/src/main/**
+!mst-social-provider-searchapi/
+!mst-social-provider-searchapi/pom.xml
+!mst-social-provider-searchapi/src/
+!mst-social-provider-searchapi/src/main/
+!mst-social-provider-searchapi/src/main/**
+!mst-social-server/
+!mst-social-server/pom.xml
+!mst-social-server/src/
+!mst-social-server/src/main/
+!mst-social-server/src/main/**
+
+# Keep local secrets excluded even if someone places them under src/main.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
