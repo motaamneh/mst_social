@@ -2,7 +2,7 @@
 
 An open-source Java project for verifying control of social accounts through temporary profile-bio verification codes.
 
-The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot server with PostgreSQL storage and tenant API-key authentication. Verification HTTP endpoints and Docker packaging are the next implementation steps.
+The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot verification API with PostgreSQL storage and tenant API-key authentication. Docker packaging remains a future step.
 
 ## Modules
 
@@ -23,7 +23,15 @@ server -> provider-searchapi -> core
 
 Maven coordinates use `com.motaamneh`, and Java packages begin with `com.motaamneh.mstsocial`.
 
+Request DTOs, domain values, configuration, and internal data holders are ordinary
+Java classes. Only HTTP response DTOs under the server's `web/dto/response` package
+use records. The core remains independent of Spring, Jackson, and Lombok.
+
 ## Build
+
+For a complete first run, follow the [tenant setup and Postman guide](mst-social-server/POSTMAN_GUIDE.md).
+It includes tenant ID creation, API-key provisioning, an importable collection and
+environment, and the full Instagram/TikTok verification flow.
 
 Install JDK 21, then run from the repository root:
 
@@ -41,7 +49,7 @@ mst-social-provider-searchapi/target/mst-social-provider-searchapi-0.0.1-SNAPSHO
 mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar
 ```
 
-The core contains [verification models, restoration, and workflow rules](mst-social-core/README.md). The [SearchAPI provider](mst-social-provider-searchapi/README.md) retrieves Instagram and TikTok biographies. The server includes JDBC persistence, Flyway migrations, and stateless tenant API-key authentication. Follow the [server setup and credential guide](mst-social-server/README.md) to configure the database and secrets, provision a tenant key, and call `GET /api/v1/tenant`. Verification HTTP endpoints are not implemented yet.
+The core contains [verification models, restoration, and workflow rules](mst-social-core/README.md). The [SearchAPI provider](mst-social-provider-searchapi/README.md) retrieves Instagram and TikTok biographies. Follow the [server setup and credential guide](mst-social-server/README.md) to configure the database and secrets and provision a tenant key. Then use the [verification API guide](mst-social-server/VERIFICATION_API.md) to create, check, verify, and cancel requests or read and revoke verified associations. The [OpenAPI contract](mst-social-server/openapi.yaml) can be imported into Postman.
 
 To build only the server and the modules it needs:
 

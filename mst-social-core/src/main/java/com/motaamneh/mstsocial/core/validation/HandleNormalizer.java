@@ -31,11 +31,11 @@ public final class HandleNormalizer {
 
         Objects.requireNonNull(input, "input must not be null");
         if (input.length() > MAX_INPUT_LENGTH) {
-            throw new IllegalArgumentException("Handle input is too long");
+            throw new InvalidHandleException("Handle input is too long");
         }
         // Check before stripping so tabs, newlines, and other controls are never hidden.
         if (input.codePoints().anyMatch(Character::isISOControl)) {
-            throw new IllegalArgumentException("Handle must not contain control characters");
+            throw new InvalidHandleException("Handle must not contain control characters");
         }
 
         String handle = input.strip();
@@ -43,12 +43,12 @@ public final class HandleNormalizer {
             handle = handle.substring(1);
         }
         if (handle.isEmpty() || handle.length() > maxLength) {
-            throw new IllegalArgumentException("Handle length must be between 1 and " + maxLength);
+            throw new InvalidHandleException("Handle length must be between 1 and " + maxLength);
         }
 
         // Validate before lowercasing to avoid turning a Unicode lookalike into valid ASCII.
         if (!ALLOWED_CHARACTERS.matcher(handle).matches()) {
-            throw new IllegalArgumentException(
+            throw new InvalidHandleException(
                     "Handle must contain only ASCII letters, digits, periods, and underscores"
             );
         }
@@ -56,14 +56,14 @@ public final class HandleNormalizer {
         switch (platform) {
             case INSTAGRAM -> {
                 if (handle.startsWith(".") || handle.endsWith(".") || handle.contains("..")) {
-                    throw new IllegalArgumentException(
+                    throw new InvalidHandleException(
                             "Instagram handle must not start or end with a period or contain consecutive periods"
                     );
                 }
             }
             case TIKTOK -> {
                 if (handle.endsWith(".")) {
-                    throw new IllegalArgumentException("TikTok handle must not end with a period");
+                    throw new InvalidHandleException("TikTok handle must not end with a period");
                 }
             }
             case X, FACEBOOK -> throw new UnsupportedOperationException("UNSUPPORTED_PLATFORM");

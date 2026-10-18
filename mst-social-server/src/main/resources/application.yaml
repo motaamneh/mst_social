@@ -35,6 +35,12 @@ management:
       show-components: never
 
 mst:
+  api:
+    rate-limits:
+      create-per-minute: 10
+      verify-per-minute: 10
+      read-per-minute: 120
+      mutation-per-minute: 30
   tenant-api-keys:
     hash-key: ${MST_TENANT_API_KEY_HASH_KEY:}
   searchapi:

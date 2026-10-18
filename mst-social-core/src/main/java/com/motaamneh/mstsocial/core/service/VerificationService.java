@@ -330,17 +330,220 @@ public final class VerificationService {
         Objects.requireNonNull(resourceId, "resourceId must not be null");
     }
 
-    private record Claim(Attempt attempt, VerificationResult result) {}
+    private static final class Claim {
+        private final Attempt attempt;
+        private final VerificationResult result;
 
-    private record Attempt(UUID requestId, UUID leaseId, Platform platform, String handle,
-                           byte[] digest, String keyVersion, Instant createdAt) {
+        private Claim(Attempt attempt, VerificationResult result) {
+            this.attempt = attempt;
+            this.result = result;
+        }
+
+        public Attempt attempt() {
+            return attempt;
+        }
+
+        public VerificationResult result() {
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Claim other)) {
+                return false;
+            }
+            return Objects.equals(attempt, other.attempt)
+                    && Objects.equals(result, other.result);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(attempt, result);
+        }
+
+        @Override
+        public String toString() {
+            return "Claim[attempt=" + attempt + ", result=" + result + "]";
+        }
+    }
+
+    private static final class Attempt {
+        private final UUID requestId;
+        private final UUID leaseId;
+        private final Platform platform;
+        private final String handle;
+        private final byte[] digest;
+        private final String keyVersion;
+        private final Instant createdAt;
+
+        private Attempt(
+                UUID requestId,
+                UUID leaseId,
+                Platform platform,
+                String handle,
+                byte[] digest,
+                String keyVersion,
+                Instant createdAt
+        ) {
+            this.requestId = requestId;
+            this.leaseId = leaseId;
+            this.platform = platform;
+            this.handle = handle;
+            this.digest = digest;
+            this.keyVersion = keyVersion;
+            this.createdAt = createdAt;
+        }
+
         @Override
         public String toString() {
             return "Attempt[redacted]";
         }
+
+        public UUID requestId() {
+            return requestId;
+        }
+
+        public UUID leaseId() {
+            return leaseId;
+        }
+
+        public Platform platform() {
+            return platform;
+        }
+
+        public String handle() {
+            return handle;
+        }
+
+        public byte[] digest() {
+            return digest;
+        }
+
+        public String keyVersion() {
+            return keyVersion;
+        }
+
+        public Instant createdAt() {
+            return createdAt;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Attempt other)) {
+                return false;
+            }
+            return Objects.equals(requestId, other.requestId)
+                    && Objects.equals(leaseId, other.leaseId)
+                    && Objects.equals(platform, other.platform)
+                    && Objects.equals(handle, other.handle)
+                    && Objects.equals(digest, other.digest)
+                    && Objects.equals(keyVersion, other.keyVersion)
+                    && Objects.equals(createdAt, other.createdAt);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(requestId, leaseId, platform, handle, digest, keyVersion, createdAt);
+        }
     }
 
-    private record Evidence(String handle, String providerAccountId, String provider) {}
+    private static final class Evidence {
+        private final String handle;
+        private final String providerAccountId;
+        private final String provider;
 
-    private record Evaluation(Evidence evidence, boolean matches, ProfileFetchResult.Failed failure) {}
+        private Evidence(String handle, String providerAccountId, String provider) {
+            this.handle = handle;
+            this.providerAccountId = providerAccountId;
+            this.provider = provider;
+        }
+
+        public String handle() {
+            return handle;
+        }
+
+        public String providerAccountId() {
+            return providerAccountId;
+        }
+
+        public String provider() {
+            return provider;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Evidence other)) {
+                return false;
+            }
+            return Objects.equals(handle, other.handle)
+                    && Objects.equals(providerAccountId, other.providerAccountId)
+                    && Objects.equals(provider, other.provider);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(handle, providerAccountId, provider);
+        }
+
+        @Override
+        public String toString() {
+            return "Evidence[handle=" + handle + ", providerAccountId=" + providerAccountId + ", provider=" + provider + "]";
+        }
+    }
+
+    private static final class Evaluation {
+        private final Evidence evidence;
+        private final boolean matches;
+        private final ProfileFetchResult.Failed failure;
+
+        private Evaluation(Evidence evidence, boolean matches, ProfileFetchResult.Failed failure) {
+            this.evidence = evidence;
+            this.matches = matches;
+            this.failure = failure;
+        }
+
+        public Evidence evidence() {
+            return evidence;
+        }
+
+        public boolean matches() {
+            return matches;
+        }
+
+        public ProfileFetchResult.Failed failure() {
+            return failure;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            if (this == value) {
+                return true;
+            }
+            if (!(value instanceof Evaluation other)) {
+                return false;
+            }
+            return Objects.equals(evidence, other.evidence)
+                    && Objects.equals(matches, other.matches)
+                    && Objects.equals(failure, other.failure);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(evidence, matches, failure);
+        }
+
+        @Override
+        public String toString() {
+            return "Evaluation[evidence=" + evidence + ", matches=" + matches + ", failure=" + failure + "]";
+        }
+    }
 }

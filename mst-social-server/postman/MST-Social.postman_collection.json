@@ -1,0 +1,328 @@
+{
+  "info": {
+    "name": "MST Social - Manual Verification API",
+    "description": "Start with mst-social-server/POSTMAN_GUIDE.md in this repository. Import MST-Social-Local.postman_environment.json and select MST Social - Local. Create a tenant and tenant API key using the documented database/local CLI steps. Store the full mst_api_ credential in Postman Local Vault as mst-social-api-key. The collection uses inherited Bearer authentication; health explicitly uses No Auth.\n\nSend requests individually, in order. Copy response IDs into the environment manually. There are no tests, pre-request scripts, post-response scripts, or automatic retries. Do not run the whole collection: you must update the social bio before verifying, and optional folders cancel requests or revoke associations. An eligible verify call consumes SearchAPI usage. No request creates tenants or API keys.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{vault:mst-social-api-key}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01 - Connection and identity",
+      "description": "Confirm the normal HTTP server is running, then authenticate your tenant credential. Neither request calls SearchAPI.",
+      "item": [
+        {
+          "name": "01 - Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "No authentication. Expect 200 with status UP; 503 means unhealthy. Start the HTTP server, not only tenant-key administration.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Who am I",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tenant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenant"
+              ]
+            },
+            "description": "Expect 200 with tenantId and credentialId. Copy them into the environment for reference. They are derived from the API key and are never submitted as tenant selectors. A 401 means the tenant credential could not authenticate."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Verify a social account",
+      "description": "Set subjectId, platform (INSTAGRAM or TIKTOK), and handle. Create once, copy the code to your social bio, then verify. Keep requestId and accountId with the same tenant credential.",
+      "item": [
+        {
+          "name": "03 - Create verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications"
+              ]
+            },
+            "description": "Expect 201. Copy response.requestId into environment verificationId. Copy the exact response.code into your social bio and save before expiresAt (default 15 minutes). The code is returned only here. Creation does not call SearchAPI. Do not send tenantId or Idempotency-Key. Repeated creation of the same active request returns 409 DUPLICATE_ACTIVE_REQUEST.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectId\": \"{{subjectId}}\",\n  \"platform\": \"{{platform}}\",\n  \"handle\": \"{{handle}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Read verification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications/{{verificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications",
+                "{{verificationId}}"
+              ]
+            },
+            "description": "Set verificationId from the creation response.requestId first. Expect 200 with current status and failedAttempts. A new request is PENDING with 0 of 10 failures. Reading does not fetch a social profile. Expired requests remain readable with status EXPIRED."
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Verify bio (provider lookup)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications/{{verificationId}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications",
+                "{{verificationId}}",
+                "verify"
+              ]
+            },
+            "description": "Send only after the exact returned code is saved in the bio. Body must be None, not {}. One eligible call fetches profile evidence and consumes SearchAPI usage. Expect 200 VERIFIED; copy account.accountId into environment accountId. An already verified request returns ALREADY_VERIFIED with its original association. Bio mismatches 1-9 return 422 CODE_NOT_FOUND; the tenth returns 409 LOCKED. Provider errors do not consume mismatch attempts. Inspect error code and Retry-After before manually retrying."
+          },
+          "response": []
+        },
+        {
+          "name": "06 - Read verified account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/social-identities/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "social-identities",
+                "{{accountId}}"
+              ]
+            },
+            "description": "Set accountId from the successful verify response.account.accountId. Expect 200 with active, validUntil, revokedAt, subjectId, and platform details. Check active: expired/revoked associations remain readable. This ID identifies the MST Social association, not the platform account."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Optional cancellation",
+      "description": "Optional separate pending request, using subjectId plus -cancel-demo. No provider lookup is needed. Copy its ID into cancelVerificationId, preserving the main verificationId. Cancellation changes state; send deliberately.",
+      "item": [
+        {
+          "name": "07 - Create request for cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications"
+              ]
+            },
+            "description": "Expect 201. Copy requestId into cancelVerificationId, not verificationId. No need to place this code in the bio. The subject has a -cancel-demo suffix; keep its total length at most 128 characters. Existing pending requests and active quotas may cause 409/429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectId\": \"{{subjectId}}-cancel-demo\",\n  \"platform\": \"{{platform}}\",\n  \"handle\": \"{{handle}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 - Cancel pending request",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications/{{cancelVerificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications",
+                "{{cancelVerificationId}}"
+              ]
+            },
+            "description": "Body must be None. Expect 200 with CANCELED for a pending request. Repeated cancellation preserves the original timestamp; terminal requests remain unchanged. This does not revoke an already verified account. To cancel a lost-code request, deliberately set cancelVerificationId to that request ID."
+          },
+          "response": []
+        },
+        {
+          "name": "09 - Read canceled request",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifications/{{cancelVerificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifications",
+                "{{cancelVerificationId}}"
+              ]
+            },
+            "description": "Expect 200 with status CANCELED after successful cancellation. Historical requests are retained. No provider lookup."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Optional account revocation",
+      "description": "Only send if you intend to revoke the saved association. This ends its active verification and preserves its history.",
+      "item": [
+        {
+          "name": "10 - Revoke verified account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json, application/problem+json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/social-identities/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "social-identities",
+                "{{accountId}}"
+              ]
+            },
+            "description": "Body must be None. Expect 200 with active false and revokedAt set. Repeated revocation retains its timestamp. This does not delete the social account or revoke the tenant API key. A new verification is required to establish a new active association; retrying the old verified request does not reactivate it."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
