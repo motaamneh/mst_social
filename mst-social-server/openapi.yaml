@@ -1,356 +1,1946 @@
 openapi: 3.1.0
 info:
   title: MST Social verification API
-  version: 0.0.1
   description: |
-    Verify control of Instagram and TikTok accounts using codes placed in profile bios.
-    Tenant identity comes from a backend-only Bearer credential. The consuming
-    application authorizes its own users and their subject/resource IDs.
-    Mutations reject Idempotency-Key headers; creation-response replay is not supported.
-    Except for creation, mutation bodies must be empty (not even an empty JSON object).
-    See VERIFICATION_API.md for retry behavior, limits, and the complete walkthrough.
+    Verify control of Instagram and TikTok accounts through a code in the profile bio.
+    This establishes control at verification time, not legal identity or permanent ownership.
+
+    Start with GET /api/v1/tenant, create a verification, copy its code into the bio,
+    then explicitly submit a verification attempt. Successful verification returns an account ID.
+    Private profiles are supported when the provider supplies a usable username and bio.
+    X and Facebook are known enum values but currently unsupported (422).
+
+    All API operations require a backend-only tenant Bearer credential. The consuming backend
+    must authorize its users and subject/resource IDs. Do not expose tenant keys in frontend code.
+    Tenant IDs are inferred from the credential. Mutations reject Idempotency-Key headers;
+    only creation accepts a body. Never log credentials or creation responses containing codes.
+    Limits described here are defaults and can be configured by the operator.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: 0.0.1-SNAPSHOT
 servers:
-  - url: http://localhost:8080
-    description: Local development; use HTTPS outside localhost
+- url: /
+  description: This server
 security:
-  - tenantKey: []
+- tenantKey: []
 tags:
-  - name: Tenant
-  - name: Verifications
-  - name: Social identities
+- name: Tenant
+  description: Identify the application authenticated by a tenant API key.
+- name: Social identities
+  description: Read and revoke verified account associations.
+- name: Verifications
+  description: "Create, inspect, verify, and cancel bio verification requests."
 paths:
-  /api/v1/tenant:
-    get:
-      tags: [Tenant]
-      operationId: getTenantIdentity
-      summary: Read the authenticated tenant and credential IDs
-      responses:
-        '200':
-          description: Authenticated identity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TenantIdentityResponse'
-        default:
-          $ref: '#/components/responses/Problem'
   /api/v1/verifications:
     post:
-      tags: [Verifications]
-      operationId: createVerification
+      tags:
+      - Verifications
       summary: Create a verification and return its code once
-      description: |
-        Does not call the provider. Returns 409 for a duplicate active request,
-        422 for a known unsupported platform, and 429 for active-request or rate limits.
-        Never log the code. GET cannot recover it if this response is lost.
+      description: "Does not call SearchAPI. Save the returned code and place it in\
+        \ the profile bio before expiry (default: 15 minutes). GET cannot recover\
+        \ the code. Duplicate active requests return 409. Default active limits: three\
+        \ per subject and three per platform/handle. Idempotency-Key is unsupported."
+      operationId: createVerification
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateVerificationRequest'
+              $ref: "#/components/schemas/CreateVerificationRequest"
+        required: true
       responses:
-        '201':
-          description: Created; code is returned only in this response
+        "201":
+          description: Created; plaintext code is returned only here
           headers:
             Location:
-              description: Relative URI of the created verification
-              schema: {type: string, format: uri-reference}
+              description: Relative URI of the new verification
+              schema:
+                type: string
+                format: uri-reference
             Cache-Control:
-              $ref: '#/components/headers/NoStore'
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationCreatedResponse'
-        '400':
-          $ref: '#/components/responses/Problem'
-        '409':
-          $ref: '#/components/responses/Problem'
-        '422':
-          $ref: '#/components/responses/Problem'
-        '429':
-          $ref: '#/components/responses/Problem'
+                $ref: "#/components/schemas/VerificationCreatedResponse"
         default:
-          $ref: '#/components/responses/Problem'
-  /api/v1/verifications/{id}:
-    parameters:
-      - $ref: '#/components/parameters/ResourceId'
-    get:
-      tags: [Verifications]
-      operationId: getVerification
-      summary: Read request status without a provider lookup
-      description: Expired and terminal requests remain readable. The code is never returned.
-      responses:
-        '200':
-          $ref: '#/components/responses/Verification'
-        '404':
-          $ref: '#/components/responses/Problem'
-        default:
-          $ref: '#/components/responses/Problem'
-    delete:
-      tags: [Verifications]
-      operationId: cancelVerification
-      summary: Cancel a pending or in-progress request
-      description: |
-        Requires an empty body. Returns terminal requests unchanged. Does not revoke
-        a verified account; use the social-identity revocation endpoint for that.
-      responses:
-        '200':
-          $ref: '#/components/responses/Verification'
-        '404':
-          $ref: '#/components/responses/Problem'
-        default:
-          $ref: '#/components/responses/Problem'
-  /api/v1/verifications/{id}/verify:
-    parameters:
-      - $ref: '#/components/parameters/ResourceId'
-    post:
-      tags: [Verifications]
-      operationId: verifyProfile
-      summary: Verify the code using provider evidence
-      description: |
-        Requires an empty body. One eligible attempt makes one provider call;
-        there is no automatic retry. Private profiles may verify with a usable bio.
-        Failures 1-9 without the code leave the request PENDING; failure 10 locks it.
-        Provider failures consume no mismatch attempts. An already successful request
-        returns its original association without fetching or extending validity.
-      responses:
-        '200':
-          description: VERIFIED or ALREADY_VERIFIED; check account.active for current validity
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
           headers:
             Cache-Control:
-              $ref: '#/components/headers/NoStore'
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "409":
+          description: "An active request already exists for this subject, platform,\
+            \ and handle."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: DUPLICATE_ACTIVE_REQUEST
+        "415":
+          description: "Send Content-Type: application/json."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unsupported Media Type
+                status: 415
+                code: UNSUPPORTED_MEDIA_TYPE
+        "422":
+          description: Known platform without an enabled provider.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unprocessable Content
+                status: 422
+                code: UNSUPPORTED_PLATFORM
+  /api/v1/verifications/{id}/verify:
+    post:
+      tags:
+      - Verifications
+      summary: Verify the code against the public profile bio
+      description: "Send no body (not even {}). One eligible attempt calls SearchAPI\
+        \ once and may consume provider usage; there is no automatic retry. Private\
+        \ profiles are allowed if their username and bio are available. Mismatches\
+        \ 1–9 leave PENDING; mismatch 10 returns LOCKED (409). Provider failures do\
+        \ not consume mismatch attempts. Success lasts one calendar year by default.\
+        \ An already verified request returns its original association without a provider\
+        \ call or extending validity; check account.active. Idempotency-Key is unsupported."
+      operationId: verifyProfile
+      parameters:
+      - name: id
+        in: path
+        description: Resource UUID within the authenticated tenant
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000001
+      responses:
+        "200":
+          description: VERIFIED or ALREADY_VERIFIED
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationAttemptResponse'
-        '404':
-          $ref: '#/components/responses/Problem'
-        '409':
-          description: IN_PROGRESS, STALE_ATTEMPT, ACCOUNT_ALREADY_LINKED, CANCELED, or LOCKED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '410':
-          $ref: '#/components/responses/Problem'
-        '422':
-          description: CODE_NOT_FOUND or provider profile unavailable/not found/unsupported
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '429':
-          $ref: '#/components/responses/Problem'
-        '502':
-          description: Provider authentication failed or returned invalid data
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorResponse'
-        '503':
-          $ref: '#/components/responses/Problem'
-        '504':
-          $ref: '#/components/responses/Problem'
+                $ref: "#/components/schemas/VerificationAttemptResponse"
         default:
-          $ref: '#/components/responses/Problem'
-  /api/v1/social-identities/{id}:
-    parameters:
-      - $ref: '#/components/parameters/ResourceId'
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: "Provider rate limited/error, STORAGE_UNAVAILABLE, or AUTHENTICATION_UNAVAILABLE.\
+            \ Provider failures include providerFailure.reason and retryable; they\
+            \ consume no mismatch attempts."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: PROVIDER_FAILURE
+                detail: The profile provider could not supply usable profile evidence.
+                providerFailure:
+                  retryable: true
+                  reason: PROVIDER_RATE_LIMITED
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "404":
+          description: Resource does not exist or belongs to another tenant; the response
+            is identical.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: REQUEST_NOT_FOUND
+        "409":
+          description: "IN_PROGRESS, STALE_ATTEMPT, ACCOUNT_ALREADY_LINKED, CANCELED,\
+            \ or LOCKED. Includes verification status."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: LOCKED
+        "410":
+          description: Request expired; create a new one.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Gone
+                status: 410
+                code: EXPIRED
+        "422":
+          description: "Code mismatch, or PROVIDER_FAILURE with PROFILE_NOT_FOUND,\
+            \ PROFILE_UNAVAILABLE, or UNSUPPORTED_PLATFORM."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unprocessable Content
+                status: 422
+                code: CODE_NOT_FOUND
+        "502":
+          description: Provider authentication failed or the provider returned an
+            invalid response.
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Gateway
+                status: 502
+                code: PROVIDER_FAILURE
+                detail: The profile provider could not supply usable profile evidence.
+                providerFailure:
+                  retryable: false
+                  reason: INVALID_PROVIDER_RESPONSE
+        "504":
+          description: Provider timed out; inspect providerFailure.retryable.
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Gateway Timeout
+                status: 504
+                code: PROVIDER_FAILURE
+                detail: The profile provider could not supply usable profile evidence.
+                providerFailure:
+                  retryable: true
+                  reason: PROVIDER_TIMEOUT
+  /api/v1/verifications/{id}:
     get:
-      tags: [Social identities]
-      operationId: getVerifiedAccount
-      summary: Read an account association and its current active flag
-      description: Expired and revoked associations remain readable.
+      tags:
+      - Verifications
+      summary: Read the current verification status
+      description: Does not call SearchAPI. Expired and terminal requests remain readable.
+        The plaintext code is never returned. A missing resource and one belonging
+        to another tenant both return 404.
+      operationId: getVerification
+      parameters:
+      - name: id
+        in: path
+        description: Resource UUID within the authenticated tenant
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000001
       responses:
-        '200':
-          $ref: '#/components/responses/VerifiedAccount'
-        '404':
-          $ref: '#/components/responses/Problem'
+        "200":
+          description: Current verification status
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
         default:
-          $ref: '#/components/responses/Problem'
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "404":
+          description: Resource does not exist or belongs to another tenant; the response
+            is identical.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: REQUEST_NOT_FOUND
     delete:
-      tags: [Social identities]
-      operationId: revokeVerifiedAccount
-      summary: Revoke an account association while retaining its history
-      description: Requires an empty body. Repeated revocation preserves its original timestamp.
+      tags:
+      - Verifications
+      summary: Cancel a pending or in-progress verification
+      description: "Send no body. Terminal requests are returned unchanged. Canceling\
+        \ does not revoke an account association; use DELETE /api/v1/social-identities/{id}\
+        \ for that. Idempotency-Key is unsupported."
+      operationId: cancelVerification
+      parameters:
+      - name: id
+        in: path
+        description: Resource UUID within the authenticated tenant
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000001
       responses:
-        '200':
-          $ref: '#/components/responses/VerifiedAccount'
-        '404':
-          $ref: '#/components/responses/Problem'
+        "200":
+          description: Current verification status after cancellation
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
         default:
-          $ref: '#/components/responses/Problem'
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "404":
+          description: Resource does not exist or belongs to another tenant; the response
+            is identical.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: REQUEST_NOT_FOUND
+  /api/v1/tenant:
+    get:
+      tags:
+      - Tenant
+      summary: Read the authenticated tenant and credential IDs
+      description: Use this first to check your tenant API key. Tenant identity is
+        derived from the Bearer credential; it is never supplied by the caller.
+      operationId: getTenantIdentity
+      responses:
+        "200":
+          description: Authenticated tenant identity
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantIdentityResponse"
+        default:
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+  /api/v1/social-identities/{id}:
+    get:
+      tags:
+      - Social identities
+      summary: Read a verified social account association
+      description: Returns expired and revoked associations too. Check active before
+        treating an association as currently verified. Missing resources and resources
+        belonging to another tenant both return 404.
+      operationId: getVerifiedAccount
+      parameters:
+      - name: id
+        in: path
+        description: Resource UUID within the authenticated tenant
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000001
+      responses:
+        "200":
+          description: Account association with its current activity flag
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifiedAccountResponse"
+        default:
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "404":
+          description: Resource does not exist or belongs to another tenant; the response
+            is identical.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: ACCOUNT_NOT_FOUND
+    delete:
+      tags:
+      - Social identities
+      summary: Revoke a social account association
+      description: Send no body. Preserves history and request links. Repeated revocation
+        preserves the original revocation timestamp. Idempotency-Key is unsupported.
+      operationId: revokeVerifiedAccount
+      parameters:
+      - name: id
+        in: path
+        description: Resource UUID within the authenticated tenant
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000001
+      responses:
+        "200":
+          description: Revoked association; active is false
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifiedAccountResponse"
+        default:
+          description: Other HTTP failures use this problem shape (for example 405
+            METHOD_NOT_ALLOWED).
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "401":
+          description: "Missing, invalid, expired, or revoked tenant key."
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer realm="mst-social"
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: UNAUTHORIZED
+        "403":
+          description: Authenticated principal lacks the required role.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: FORBIDDEN
+        "406":
+          description: Requested response media type is unsupported.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Acceptable
+                status: 406
+                code: NOT_ACCEPTABLE
+        "500":
+          description: Unexpected server failure; no internal details are returned.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: INTERNAL_ERROR
+        "503":
+          description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
+            before retrying a mutation.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: STORAGE_UNAVAILABLE
+        "400":
+          description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
+            \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: INVALID_REQUEST
+        "429":
+          description: "Tenant rate limit exceeded (defaults per minute: create 10,\
+            \ verify 10, read 120, mutate 30). Creation can also return ACTIVE_REQUEST_LIMIT_REACHED;\
+            \ that error has no Retry-After."
+          headers:
+            Retry-After:
+              description: Optional delay in seconds; present for tenant rate limits
+                or a provider-supplied delay
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: RATE_LIMIT_EXCEEDED
+        "404":
+          description: Resource does not exist or belongs to another tenant; the response
+            is identical.
+          headers:
+            Cache-Control:
+              description: Responses must not be cached
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: ACCOUNT_NOT_FOUND
 components:
-  securitySchemes:
-    tenantKey:
-      type: http
-      scheme: bearer
-      bearerFormat: mst_api_<credential-uuid>.<secret>
-      description: Provisioned tenant API key; send only from your backend
-  parameters:
-    ResourceId:
-      name: id
-      in: path
-      required: true
-      description: Resource UUID within the authenticated tenant
-      schema: {type: string, format: uuid}
-  headers:
-    NoStore:
-      description: Prevent caching of private verification data
-      schema: {type: string, const: no-store}
-    RetryAfter:
-      description: Present for tenant rate limits or a provider-supplied retry delay, in seconds
-      schema: {type: integer, minimum: 1}
-  responses:
-    Problem:
-      description: |
-        Safe error response. Missing/invalid credentials return 401, authentication
-        storage unavailability returns 503. Missing resources and resources owned
-        by another tenant return the same 404. Rate limits return 429 with Retry-After.
-        Unexpected failures return 500 without exception details.
-      headers:
-        Cache-Control:
-          $ref: '#/components/headers/NoStore'
-        Retry-After:
-          $ref: '#/components/headers/RetryAfter'
-        WWW-Authenticate:
-          description: Present for 401 responses
-          schema: {type: string, example: 'Bearer realm="mst-social"'}
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/ApiErrorResponse'
-    Verification:
-      description: Current verification status; no plaintext code or stored digest
-      headers:
-        Cache-Control:
-          $ref: '#/components/headers/NoStore'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/VerificationResponse'
-    VerifiedAccount:
-      description: Account association with activity calculated at read time
-      headers:
-        Cache-Control:
-          $ref: '#/components/headers/NoStore'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/VerifiedAccountResponse'
   schemas:
-    Platform:
-      type: string
-      enum: [INSTAGRAM, TIKTOK, X, FACEBOOK]
-      description: Only INSTAGRAM and TIKTOK currently have a provider
     CreateVerificationRequest:
       type: object
       additionalProperties: false
-      required: [subjectId, platform, handle]
+      description: Create a verification for a user in your application. Tenant identity
+        comes from the API key.
       properties:
         subjectId:
           type: string
-          minLength: 1
-          maxLength: 128
-          description: Nonblank application user ID; ASCII control characters are forbidden
+          description: Your application user ID; nonblank and without ASCII control
+            characters.
           example: user-123
+          maxLength: 128
+          minLength: 1
+          pattern: "[^\\x00-\\x1F\\x7F]*"
         platform:
-          $ref: '#/components/schemas/Platform'
+          type: string
+          description: INSTAGRAM and TIKTOK are supported. X and FACEBOOK return 422;
+            unknown enum values return 400.
+          enum:
+          - INSTAGRAM
+          - FACEBOOK
+          - X
+          - TIKTOK
+          example: INSTAGRAM
         handle:
           type: string
-          minLength: 1
-          maxLength: 256
-          description: Nonblank handle, optionally prefixed with @; platform validation follows normalization
+          description: "Social username, optionally prefixed by @. Platform validation\
+            \ follows normalization."
           example: '@your_username'
-    TenantIdentityResponse:
-      type: object
-      required: [tenantId, credentialId]
-      properties:
-        tenantId: {type: string, format: uuid}
-        credentialId: {type: string, format: uuid}
+          maxLength: 256
+          minLength: 1
+      required:
+      - handle
+      - platform
+      - subjectId
     VerificationCreatedResponse:
       type: object
-      required: [requestId, code, expiresAt, instructions]
+      description: New verification. The code appears only in this response; save
+        it securely until it is placed in the bio.
       properties:
-        requestId: {type: string, format: uuid}
+        requestId:
+          type: string
+          format: uuid
+          description: Verification request UUID.
+          example: 00000000-0000-4000-8000-000000000001
         code:
           type: string
-          description: Secret verification code returned once; never log this response
-        expiresAt: {type: string, format: date-time}
-        instructions: {type: string}
-    VerificationResponse:
-      type: object
-      required: [requestId, subjectId, platform, normalizedHandle, status, failedAttempts, maxFailedAttempts, createdAt, expiresAt, verifiedAt, canceledAt]
-      properties:
-        requestId: {type: string, format: uuid}
-        subjectId: {type: string}
-        platform:
-          $ref: '#/components/schemas/Platform'
-        normalizedHandle: {type: string}
-        status:
+          description: "Exact verification marker returned once. Example is illustrative,\
+            \ not a usable verification code."
+          example: mst-ig-EXAMPLE_ONLY
+        expiresAt:
           type: string
-          enum: [PENDING, VERIFYING, VERIFIED, EXPIRED, LOCKED, CANCELED]
-        failedAttempts: {type: integer, minimum: 0}
-        maxFailedAttempts: {type: integer, minimum: 1}
-        createdAt: {type: string, format: date-time}
-        expiresAt: {type: string, format: date-time}
-        verifiedAt: {type: [string, 'null'], format: date-time}
-        canceledAt: {type: [string, 'null'], format: date-time}
-    VerifiedAccountResponse:
-      type: object
-      required: [accountId, subjectId, platform, canonicalHandle, providerAccountId, evidenceProvider, verifiedAt, validUntil, revokedAt, active]
-      properties:
-        accountId: {type: string, format: uuid}
-        subjectId: {type: string}
-        platform:
-          $ref: '#/components/schemas/Platform'
-        canonicalHandle: {type: string}
-        providerAccountId: {type: [string, 'null']}
-        evidenceProvider: {type: string}
-        verifiedAt: {type: string, format: date-time}
-        validUntil: {type: string, format: date-time}
-        revokedAt: {type: [string, 'null'], format: date-time}
-        active: {type: boolean}
-    VerificationAttemptResponse:
-      type: object
-      required: [outcome, verification, account]
-      properties:
-        outcome: {type: string, enum: [VERIFIED, ALREADY_VERIFIED]}
-        verification:
-          $ref: '#/components/schemas/VerificationResponse'
-        account:
-          $ref: '#/components/schemas/VerifiedAccountResponse'
+          format: date-time
+          description: "Verification deadline (default: 15 minutes after creation)."
+          example: 2026-10-18T12:15:00Z
+        instructions:
+          type: string
+          description: Instructions for the user.
+          example: "Add this exact code to your social profile bio, then submit a\
+            \ verification attempt before expiry."
+      required:
+      - code
+      - expiresAt
+      - instructions
+      - requestId
     ApiErrorResponse:
       type: object
-      required: [type, title, status, code]
+      description: "Safe problem details. Optional fields are omitted when absent;\
+        \ security errors may contain only type, title, status, and code."
       properties:
-        type: {type: string, format: uri, const: 'about:blank'}
-        title: {type: string}
-        status: {type: integer, minimum: 400, maximum: 599}
+        type:
+          type: string
+          format: uri
+          description: Problem type URI.
+          example: about:blank
+        title:
+          type: string
+          description: HTTP status title.
+          example: Bad Request
+        status:
+          type: integer
+          format: int32
+          description: HTTP error status.
+          example: 400
+          maximum: 599
+          minimum: 400
         code:
           type: string
-          description: Stable code for programmatic handling; see VERIFICATION_API.md
-        detail: {type: string}
+          description: Stable machine-readable error code.
+          example: VALIDATION_FAILED
+        detail:
+          type: string
+          description: Safe explanation; omitted by security responses.
+          example: One or more request fields are invalid.
         errors:
           type: array
+          description: Present for request field validation errors.
           items:
-            $ref: '#/components/schemas/FieldErrorResponse'
+            $ref: "#/components/schemas/FieldErrorResponse"
         verification:
-          $ref: '#/components/schemas/VerificationResponse'
+          $ref: "#/components/schemas/VerificationResponse"
+          description: Current verification state.
         providerFailure:
-          $ref: '#/components/schemas/ProviderFailureResponse'
+          $ref: "#/components/schemas/ProviderFailureResponse"
+          description: Present when profile evidence could not be fetched or used.
+      required:
+      - code
+      - status
+      - title
+      - type
     FieldErrorResponse:
       type: object
-      required: [field, message]
+      description: A validation failure without the rejected input value.
       properties:
-        field: {type: string}
-        message: {type: string}
+        field:
+          type: string
+          description: Invalid request field.
+          example: subjectId
+        message:
+          type: string
+          description: Validation explanation.
+          example: must not be blank
+      required:
+      - field
+      - message
     ProviderFailureResponse:
       type: object
-      required: [reason, retryable]
+      description: Provider failure details. A provider failure does not increment
+        the bio mismatch count.
       properties:
         reason:
           type: string
-          enum: [PROFILE_NOT_FOUND, PROFILE_UNAVAILABLE, UNSUPPORTED_PLATFORM, PROVIDER_TIMEOUT, PROVIDER_AUTHENTICATION_FAILED, INVALID_PROVIDER_RESPONSE, PROVIDER_RATE_LIMITED, PROVIDER_ERROR]
-        retryable: {type: boolean}
-        retryAfterSeconds: {type: integer, minimum: 1, maximum: 86400}
+          description: Reason provider evidence was unavailable.
+          enum:
+          - PROFILE_NOT_FOUND
+          - PROFILE_UNAVAILABLE
+          - PROVIDER_RATE_LIMITED
+          - PROVIDER_AUTHENTICATION_FAILED
+          - PROVIDER_TIMEOUT
+          - INVALID_PROVIDER_RESPONSE
+          - UNSUPPORTED_PLATFORM
+          - PROVIDER_ERROR
+          example: PROVIDER_TIMEOUT
+        retryable:
+          type: boolean
+          description: Whether the provider failure can be retried while the request
+            remains eligible.
+          example: true
+        retryAfterSeconds:
+          type: integer
+          format: int64
+          description: Optional provider-supplied delay in seconds (1–86400).
+          example: 30
+          maximum: 86400
+          minimum: 1
+      required:
+      - reason
+      - retryable
+    VerificationResponse:
+      type: object
+      description: "Current verification state without the code, digest, bio, or internal\
+        \ attempt lease."
+      example:
+        requestId: 00000000-0000-4000-8000-000000000001
+        subjectId: user-123
+        platform: INSTAGRAM
+        normalizedHandle: your_username
+        status: PENDING
+        failedAttempts: 0
+        maxFailedAttempts: 10
+        createdAt: 2026-10-18T12:00:00Z
+        expiresAt: 2026-10-18T12:15:00Z
+        verifiedAt: null
+        canceledAt: null
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Verification request UUID.
+          example: 00000000-0000-4000-8000-000000000001
+        subjectId:
+          type: string
+          description: User ID in the consuming application.
+          example: user-123
+        platform:
+          type: string
+          description: Social platform.
+          enum:
+          - INSTAGRAM
+          - FACEBOOK
+          - X
+          - TIKTOK
+          example: INSTAGRAM
+        normalizedHandle:
+          type: string
+          description: Validated normalized requested username.
+          example: your_username
+        status:
+          type: string
+          description: Current state; mismatch 10 locks the request under the default
+            policy.
+          enum:
+          - PENDING
+          - VERIFYING
+          - VERIFIED
+          - EXPIRED
+          - CANCELED
+          - LOCKED
+          example: PENDING
+        failedAttempts:
+          type: integer
+          format: int32
+          description: Number of bio mismatches; provider failures do not increase
+            this count.
+          example: 0
+          minimum: 0
+        maxFailedAttempts:
+          type: integer
+          format: int32
+          description: Mismatch limit; default is 10.
+          example: 10
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation time in UTC.
+          example: 2026-10-18T12:00:00Z
+        expiresAt:
+          type: string
+          format: date-time
+          description: "Verification deadline (default: 15 minutes after creation)."
+          example: 2026-10-18T12:15:00Z
+        verifiedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: Successful verification time; null on an unverified request.
+          example: 2026-10-18T12:02:00Z
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: "Cancellation time, or null if not canceled."
+      required:
+      - canceledAt
+      - createdAt
+      - expiresAt
+      - failedAttempts
+      - maxFailedAttempts
+      - normalizedHandle
+      - platform
+      - requestId
+      - status
+      - subjectId
+      - verifiedAt
+    VerificationAttemptResponse:
+      type: object
+      description: "Successful verification, including the associated account. Failed\
+        \ attempts use ApiErrorResponse."
+      example:
+        outcome: VERIFIED
+        verification:
+          requestId: 00000000-0000-4000-8000-000000000001
+          subjectId: user-123
+          platform: INSTAGRAM
+          normalizedHandle: your_username
+          status: VERIFIED
+          failedAttempts: 0
+          maxFailedAttempts: 10
+          createdAt: 2026-10-18T12:00:00Z
+          expiresAt: 2026-10-18T12:15:00Z
+          verifiedAt: 2026-10-18T12:02:00Z
+          canceledAt: null
+        account:
+          accountId: 00000000-0000-4000-8000-000000000002
+          subjectId: user-123
+          platform: INSTAGRAM
+          canonicalHandle: your_username
+          providerAccountId: null
+          evidenceProvider: searchapi
+          verifiedAt: 2026-10-18T12:02:00Z
+          validUntil: 2027-10-18T12:02:00Z
+          revokedAt: null
+          active: true
+      properties:
+        outcome:
+          type: string
+          description: Successful outcomes only; failures use the problem response.
+          enum:
+          - VERIFIED
+          - ALREADY_VERIFIED
+          example: VERIFIED
+        verification:
+          $ref: "#/components/schemas/VerificationResponse"
+          description: Current verification state.
+        account:
+          $ref: "#/components/schemas/VerifiedAccountResponse"
+          description: Associated social identity. Check active even for ALREADY_VERIFIED.
+      required:
+      - account
+      - outcome
+      - verification
+    VerifiedAccountResponse:
+      type: object
+      description: Historical account association; active reflects expiry and revocation
+        at the time of the response.
+      example:
+        accountId: 00000000-0000-4000-8000-000000000002
+        subjectId: user-123
+        platform: INSTAGRAM
+        canonicalHandle: your_username
+        providerAccountId: null
+        evidenceProvider: searchapi
+        verifiedAt: 2026-10-18T12:02:00Z
+        validUntil: 2027-10-18T12:02:00Z
+        revokedAt: null
+        active: true
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          description: Verified association UUID; use this for social-identity endpoints.
+          example: 00000000-0000-4000-8000-000000000002
+        subjectId:
+          type: string
+          description: User ID in the consuming application.
+          example: user-123
+        platform:
+          type: string
+          description: Social platform.
+          enum:
+          - INSTAGRAM
+          - FACEBOOK
+          - X
+          - TIKTOK
+          example: INSTAGRAM
+        canonicalHandle:
+          type: string
+          description: Username confirmed by the provider.
+          example: your_username
+        providerAccountId:
+          type:
+          - string
+          - "null"
+          description: Stable platform account ID if supplied; currently may be null.
+            Handles can change.
+        evidenceProvider:
+          type: string
+          description: Provider used to retrieve profile evidence.
+          example: searchapi
+        verifiedAt:
+          type: string
+          format: date-time
+          description: Time this account association was verified.
+          example: 2026-10-18T12:02:00Z
+        validUntil:
+          type: string
+          format: date-time
+          description: Association expiry; default is one calendar year after verification.
+          example: 2027-10-18T12:02:00Z
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: "Revocation time, or null if not revoked."
+        active:
+          type: boolean
+          description: True only while the association is valid and not revoked.
+          example: true
+      required:
+      - accountId
+      - active
+      - canonicalHandle
+      - evidenceProvider
+      - platform
+      - providerAccountId
+      - revokedAt
+      - subjectId
+      - validUntil
+      - verifiedAt
+    TenantIdentityResponse:
+      type: object
+      description: Identity derived from the authenticated tenant credential.
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: Application tenant UUID; inferred from the credential.
+          example: 00000000-0000-4000-8000-000000000010
+        credentialId:
+          type: string
+          format: uuid
+          description: UUID of the API key used for this call.
+          example: 00000000-0000-4000-8000-000000000020
+      required:
+      - credentialId
+      - tenantId
+  securitySchemes:
+    tenantKey:
+      type: http
+      description: Paste the complete tenant API key without the Bearer prefix. This
+        is not a JWT. Provision keys with the tenant-key CLI. Keep them on your application
+        backend.
+      scheme: bearer
+      bearerFormat: mst_api_<credential-uuid>.<secret>

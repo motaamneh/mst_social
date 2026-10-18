@@ -27,6 +27,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      MST_API_DOCS_ENABLED: ${MST_API_DOCS_ENABLED:-true}
       MST_DB_URL: jdbc:postgresql://db:5432/mst_social_db
       MST_DB_USERNAME: mst_social
       MST_DB_PASSWORD: ${MST_DB_PASSWORD:?Set MST_DB_PASSWORD in .env.docker}

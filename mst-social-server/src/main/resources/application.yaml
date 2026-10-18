@@ -34,7 +34,25 @@ management:
       show-details: never
       show-components: never
 
+springdoc:
+  api-docs:
+    enabled: ${mst.api-docs.enabled}
+    version: OPENAPI_3_1
+  swagger-ui:
+    enabled: ${mst.api-docs.enabled}
+    persist-authorization: false
+    disable-swagger-default-url: true
+    validator-url: ""
+    tags-sorter: alpha
+    operations-sorter: alpha
+    display-request-duration: true
+  packages-to-scan: com.motaamneh.mstsocial.server.web
+  paths-to-match: /api/v1/**
+  override-with-generic-response: false
+
 mst:
+  api-docs:
+    enabled: ${MST_API_DOCS_ENABLED:false}
   api:
     rate-limits:
       create-per-minute: 10

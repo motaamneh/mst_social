@@ -11,6 +11,13 @@ The key identifies your application. Your backend must authenticate its own user
 and authorize which `subjectId`, verification, and account they may access. Keep
 the tenant key out of browser and mobile code.
 
+## Interactive documentation
+
+Use [Swagger UI](../docs/SWAGGER_GUIDE.md) at `/swagger-ui.html` when
+`MST_API_DOCS_ENABLED=true` (default in Docker Compose). The live definition is
+available at `/v3/api-docs` and `/v3/api-docs.yaml`. The Java annotations and
+OpenAPI configuration are the source of the checked-in YAML export.
+
 ## Endpoints
 
 Paths below start with `/api/v1`. Resource IDs are UUIDs.

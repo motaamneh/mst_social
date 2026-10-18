@@ -3,6 +3,7 @@ package com.motaamneh.mstsocial.server.config;
 import com.motaamneh.mstsocial.server.security.SecurityErrorResponse;
 import com.motaamneh.mstsocial.server.security.TenantApiKeyAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,7 +22,8 @@ import org.springframework.security.web.context.NullSecurityContextRepository;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfiguration {
     @Bean
-    SecurityFilterChain tenantSecurityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager)
+    SecurityFilterChain tenantSecurityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager,
+            @Value("${mst.api-docs.enabled:false}") boolean apiDocsEnabled)
             throws Exception {
         return http
                 // Credentials are explicit bearer headers; cookie/session and browser login are disabled.
@@ -32,11 +34,17 @@ public class SecurityConfiguration {
                 .requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
-                .authorizeHttpRequests(authorize -> authorize
+                .authorizeHttpRequests(authorize -> {
+                    if (apiDocsEnabled) {
+                        authorize.requestMatchers(HttpMethod.GET, "/swagger-ui.html", "/swagger-ui/**",
+                                "/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/swagger-config").permitAll();
+                    }
+                    authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/api/v1", "/api/v1/**").hasRole("TENANT")
-                        .anyRequest().denyAll())
+                        .anyRequest().denyAll();
+                })
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
                                 SecurityErrorResponse.UNAUTHORIZED.writeTo(response))

@@ -15,10 +15,23 @@ It starts the API and a separate PostgreSQL database, applies the same migration
 and shows how to run tenant provisioning commands inside the containers. The setup
 below is for a local JVM/IDE connected to an existing database.
 
+## Swagger UI
+
+Set `MST_API_DOCS_ENABLED=true` and restart the application, then open
+<http://localhost:8080/swagger-ui.html>. Compose enables it by default for local use.
+API operations still require a tenant Bearer key. See the
+[complete Swagger guide](../docs/SWAGGER_GUIDE.md) for the walkthrough and code wiring.
+Live OpenAPI: `/v3/api-docs` (JSON) and `/v3/api-docs.yaml` (YAML).
+The checked-in `openapi.yaml` is an export of the generated definition.
+
 ## Connect your existing database
 
 The application defaults to `jdbc:postgresql://localhost:5432/mst_social_db`.
 Set these environment variables in your IntelliJ run configuration or shell:
+
+Use the committed [`.env.example`](../.env.example) as the configuration template.
+Copy it to `.env` for local values or copy its variable names into IntelliJ.
+For Docker Compose, use [`docker.env.example`](../docker.env.example) instead.
 
 | Variable | Value |
 | --- | --- |
