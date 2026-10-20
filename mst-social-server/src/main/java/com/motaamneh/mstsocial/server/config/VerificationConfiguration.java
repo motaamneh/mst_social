@@ -11,8 +11,10 @@ import com.motaamneh.mstsocial.core.validation.HandleNormalizer;
 import com.motaamneh.mstsocial.provider.searchapi.SearchApiProfileParser;
 import com.motaamneh.mstsocial.provider.searchapi.SearchApiProfileProvider;
 import com.motaamneh.mstsocial.provider.searchapi.SearchApiSettings;
+import com.motaamneh.mstsocial.server.observability.LoggingProfileProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -94,6 +96,12 @@ public class VerificationConfiguration {
             Clock clock
     ) {
         return new SearchApiProfileProvider(properties.apiKey(), settings, parser, normalizer, clock);
+    }
+
+    @Bean
+    @Primary
+    ProfileProvider loggingProfileProvider(SearchApiProfileProvider provider) {
+        return new LoggingProfileProvider(provider);
     }
 
     @Bean

@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +21,7 @@ import java.io.IOException;
 import java.util.Enumeration;
 
 /** Registered only inside Spring Security's filter chain, never as a servlet filter bean. */
+@Slf4j
 public final class TenantApiKeyAuthenticationFilter extends OncePerRequestFilter {
     private static final String SCHEME = "Bearer ";
     private static final RequestMatcher API_PATHS = new OrRequestMatcher(
@@ -41,6 +44,9 @@ public final class TenantApiKeyAuthenticationFilter extends OncePerRequestFilter
             throws ServletException, IOException {
         String credential = readCredential(request);
         if (credential == null) {
+            log.atWarn().addKeyValue("event", "authentication.failed")
+                    .addKeyValue("reason", "MISSING_OR_INVALID_AUTHORIZATION_HEADER")
+                    .log("Tenant authentication rejected");
             SecurityErrorResponse.UNAUTHORIZED.writeTo(response);
             return;
         }
@@ -60,6 +66,10 @@ public final class TenantApiKeyAuthenticationFilter extends OncePerRequestFilter
         }
 
         var context = SecurityContextHolder.createEmptyContext();
+        TenantPrincipal principal = (TenantPrincipal) authenticated.getPrincipal();
+        MDC.put("tenantId", principal.tenantId().toString());
+        MDC.put("credentialId", principal.credentialId().toString());
+        log.atDebug().addKeyValue("event", "authentication.succeeded").log("Tenant authenticated");
         context.setAuthentication(authenticated);
         SecurityContextHolder.setContext(context);
         try {

@@ -57,6 +57,12 @@ paths:
               schema:
                 type: string
                 format: uri-reference
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -70,6 +76,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -91,6 +103,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -108,6 +126,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -125,6 +149,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -142,6 +172,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -160,6 +196,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -178,6 +220,12 @@ paths:
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -204,6 +252,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -222,6 +276,12 @@ paths:
           description: "An active request already exists for this subject, platform,\
             \ and handle."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -239,6 +299,12 @@ paths:
         "415":
           description: "Send Content-Type: application/json."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -256,6 +322,12 @@ paths:
         "422":
           description: Known platform without an enabled provider.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -296,6 +368,12 @@ paths:
         "200":
           description: VERIFIED or ALREADY_VERIFIED
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -309,6 +387,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -330,6 +414,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -347,6 +437,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -364,6 +460,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -381,6 +483,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -407,6 +515,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -423,12 +537,18 @@ paths:
                 code: PROVIDER_FAILURE
                 detail: The profile provider could not supply usable profile evidence.
                 providerFailure:
-                  retryable: true
                   reason: PROVIDER_RATE_LIMITED
+                  retryable: true
         "400":
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -455,6 +575,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -473,6 +599,12 @@ paths:
           description: Resource does not exist or belongs to another tenant; the response
             is identical.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -491,6 +623,12 @@ paths:
           description: "IN_PROGRESS, STALE_ATTEMPT, ACCOUNT_ALREADY_LINKED, CANCELED,\
             \ or LOCKED. Includes verification status."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -508,6 +646,12 @@ paths:
         "410":
           description: Request expired; create a new one.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -533,6 +677,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -558,6 +708,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -574,8 +730,8 @@ paths:
                 code: PROVIDER_FAILURE
                 detail: The profile provider could not supply usable profile evidence.
                 providerFailure:
-                  retryable: false
                   reason: INVALID_PROVIDER_RESPONSE
+                  retryable: false
         "504":
           description: Provider timed out; inspect providerFailure.retryable.
           headers:
@@ -586,6 +742,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -602,8 +764,8 @@ paths:
                 code: PROVIDER_FAILURE
                 detail: The profile provider could not supply usable profile evidence.
                 providerFailure:
-                  retryable: true
                   reason: PROVIDER_TIMEOUT
+                  retryable: true
   /api/v1/verifications/{id}:
     get:
       tags:
@@ -626,6 +788,12 @@ paths:
         "200":
           description: Current verification status
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -639,6 +807,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -660,6 +834,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -677,6 +857,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -694,6 +880,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -711,6 +903,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -729,6 +927,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -747,6 +951,12 @@ paths:
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -773,6 +983,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -791,6 +1007,12 @@ paths:
           description: Resource does not exist or belongs to another tenant; the response
             is identical.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -826,6 +1048,12 @@ paths:
         "200":
           description: Current verification status after cancellation
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -839,6 +1067,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -860,6 +1094,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -877,6 +1117,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -894,6 +1140,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -911,6 +1163,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -929,6 +1187,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -947,6 +1211,12 @@ paths:
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -973,6 +1243,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -991,6 +1267,12 @@ paths:
           description: Resource does not exist or belongs to another tenant; the response
             is identical.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1017,6 +1299,12 @@ paths:
         "200":
           description: Authenticated tenant identity
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1030,6 +1318,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1051,6 +1345,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1068,6 +1368,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1085,6 +1391,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1102,6 +1414,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1120,6 +1438,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1156,6 +1480,12 @@ paths:
         "200":
           description: Account association with its current activity flag
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1169,6 +1499,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1190,6 +1526,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1207,6 +1549,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1224,6 +1572,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1241,6 +1595,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1259,6 +1619,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1277,6 +1643,12 @@ paths:
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1303,6 +1675,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1321,6 +1699,12 @@ paths:
           description: Resource does not exist or belongs to another tenant; the response
             is identical.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1355,6 +1739,12 @@ paths:
         "200":
           description: Revoked association; active is false
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1368,6 +1758,12 @@ paths:
           description: Other HTTP failures use this problem shape (for example 405
             METHOD_NOT_ALLOWED).
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1389,6 +1785,12 @@ paths:
               schema:
                 type: string
                 example: Bearer realm="mst-social"
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1406,6 +1808,12 @@ paths:
         "403":
           description: Authenticated principal lacks the required role.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1423,6 +1831,12 @@ paths:
         "406":
           description: Requested response media type is unsupported.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1440,6 +1854,12 @@ paths:
         "500":
           description: Unexpected server failure; no internal details are returned.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1458,6 +1878,12 @@ paths:
           description: STORAGE_UNAVAILABLE or AUTHENTICATION_UNAVAILABLE. Read status
             before retrying a mutation.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1476,6 +1902,12 @@ paths:
           description: "INVALID_REQUEST (UUID/JSON), VALIDATION_FAILED (fields), INVALID_HANDLE,\
             \ UNEXPECTED_BODY, or IDEMPOTENCY_NOT_SUPPORTED."
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1502,6 +1934,12 @@ paths:
                 type: integer
                 format: int32
                 minimum: 1
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:
@@ -1520,6 +1958,12 @@ paths:
           description: Resource does not exist or belongs to another tenant; the response
             is identical.
           headers:
+            X-Request-Id:
+              description: Server-generated correlation UUID; use it to find request
+                logs
+              schema:
+                type: string
+                format: uuid
             Cache-Control:
               description: Responses must not be cached
               schema:

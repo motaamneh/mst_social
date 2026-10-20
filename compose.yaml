@@ -27,6 +27,8 @@ services:
       db:
         condition: service_healthy
     environment:
+      MST_LOG_LEVEL: ${MST_LOG_LEVEL:-INFO}
+      MST_LOG_FORMAT: ${MST_LOG_FORMAT:-}
       MST_API_DOCS_ENABLED: ${MST_API_DOCS_ENABLED:-true}
       MST_DB_URL: jdbc:postgresql://db:5432/mst_social_db
       MST_DB_USERNAME: mst_social

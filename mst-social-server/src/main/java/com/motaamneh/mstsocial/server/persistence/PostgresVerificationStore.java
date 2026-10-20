@@ -11,6 +11,9 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.TimeUnit;
+
 import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -28,6 +31,7 @@ import java.util.function.Function;
 
 /** JDBC adapter with tenant locks, explicit saves, and commit-before-return semantics. */
 @Repository
+@Slf4j
 public class PostgresVerificationStore implements VerificationStore {
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transactions;
@@ -51,21 +55,32 @@ public class PostgresVerificationStore implements VerificationStore {
                 || TransactionSynchronizationManager.hasResource(dataSource)) {
             throw new IllegalStateException("Call VerificationStore outside an existing transaction");
         }
-        return transactions.execute(status -> {
-            List<UUID> tenants = jdbc.query(
-                    "SELECT id FROM tenants WHERE id = :tenant FOR UPDATE",
-                    new MapSqlParameterSource("tenant", tenantId),
-                    (rs, row) -> rs.getObject("id", UUID.class));
-            if (tenants.isEmpty()) {
-                throw new IllegalArgumentException("Unknown tenant");
-            }
-            Session session = new Session(tenantId);
-            try {
-                return work.apply(session);
-            } finally {
-                session.open = false;
-            }
-        });
+        long startedAt = System.nanoTime();
+        boolean committed = false;
+        try {
+            T result = transactions.execute(status -> {
+                List<UUID> tenants = jdbc.query(
+                        "SELECT id FROM tenants WHERE id = :tenant FOR UPDATE",
+                        new MapSqlParameterSource("tenant", tenantId),
+                        (rs, row) -> rs.getObject("id", UUID.class));
+                if (tenants.isEmpty()) {
+                    throw new IllegalArgumentException("Unknown tenant");
+                }
+                Session session = new Session(tenantId);
+                try {
+                    return work.apply(session);
+                } finally {
+                    session.open = false;
+                }
+            });
+            committed = true;
+            return result;
+        } finally {
+            log.atDebug().addKeyValue("event", "storage.transaction.completed")
+                    .addKeyValue("committed", committed)
+                    .addKeyValue("durationMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt))
+                    .log("Verification transaction completed");
+        }
     }
 
     private final class Session implements Transaction {

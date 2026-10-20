@@ -2,6 +2,7 @@ package com.motaamneh.mstsocial.server.config;
 
 import com.motaamneh.mstsocial.server.security.SecurityErrorResponse;
 import com.motaamneh.mstsocial.server.security.TenantApiKeyAuthenticationFilter;
+import com.motaamneh.mstsocial.server.web.ApiRequestLoggingFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -52,6 +53,7 @@ public class SecurityConfiguration {
                                 SecurityErrorResponse.FORBIDDEN.writeTo(response)))
                 .addFilterBefore(new TenantApiKeyAuthenticationFilter(authenticationManager),
                         AnonymousAuthenticationFilter.class)
+                .addFilterBefore(new ApiRequestLoggingFilter(), TenantApiKeyAuthenticationFilter.class)
                 .build();
     }
 }

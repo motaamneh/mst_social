@@ -5,7 +5,10 @@ It authenticates application backends with tenant API keys and exposes verificat
 and verified-account endpoints. See the [API walkthrough](VERIFICATION_API.md) and
 [OpenAPI contract](openapi.yaml) for request bodies, responses, and error codes.
 
-**First time running the API?** Follow [Start to finish: tenant setup and Postman](POSTMAN_GUIDE.md).
+**Running locally in IntelliJ?** Follow the [local run guide](../docs/LOCAL_RUN_GUIDE.md)
+for database setup, tenant creation, Terminal environment settings, and Postman Bearer authentication.
+
+**Want the full API walkthrough?** Follow [Start to finish: tenant setup and Postman](POSTMAN_GUIDE.md).
 It explains how to get your tenant ID and API key, and includes a ready-to-import
 [collection](postman/MST-Social.postman_collection.json) and
 [environment template](postman/MST-Social-Local.postman_environment.json).
@@ -23,6 +26,12 @@ API operations still require a tenant Bearer key. See the
 [complete Swagger guide](../docs/SWAGGER_GUIDE.md) for the walkthrough and code wiring.
 Live OpenAPI: `/v3/api-docs` (JSON) and `/v3/api-docs.yaml` (YAML).
 The checked-in `openapi.yaml` is an export of the generated definition.
+
+## Request logging
+
+See the [logging guide](../docs/LOGGING_GUIDE.md) for request correlation, authentication
+failure reasons, verification/provider events, log levels, and JSON output. Set
+`MST_LOG_LEVEL=DEBUG` in IntelliJ and restart for detailed troubleshooting.
 
 ## Connect your existing database
 
@@ -110,6 +119,23 @@ must still authenticate its own users and decide which subject IDs they may use.
 
 ## Tenant API-key authentication
 
+`GET /api/v1/tenant` ("Who am I" in Postman) returns the application tenant and
+credential IDs for the key you send. It does not log in a social user or issue a key.
+
+| Value | Purpose | Use as the API Bearer token? |
+| --- | --- | --- |
+| Full `mst_api_...` credential from `tenant-key create` | Authenticate your application backend | Yes |
+| `SEARCHAPI_API_KEY` | Let this server call SearchAPI | No |
+| `MST_TENANT_API_KEY_HASH_KEY` | Server secret for hashing tenant credentials | No |
+| `MST_VERIFICATION_KEY_V1` | Server secret for verification codes | No |
+| Tenant UUID / credential UUID | Identify database records | No |
+
+Follow steps 1–4 below to generate the Bearer credential. The CLI must connect to
+the **same database** and use the **same tenant hash key** as the running server.
+IntelliJ Run Configuration environment variables do not automatically carry over
+to Terminal. A key created in the Docker database will not exist in a separate
+PostgreSQL database used by IntelliJ.
+
 V3 creates `tenant_api_keys`. Each row contains a generated credential UUID,
 the owning tenant UUID, a name, a 32-byte HMAC-SHA256 digest, creation time,
 optional expiry, and optional revocation time. The secret itself is never stored.
@@ -179,7 +205,11 @@ With the normal server running:
 
 1. Create a `GET http://localhost:8080/api/v1/tenant` request.
 2. Open **Authorization**, select **Bearer Token**, and paste the full credential.
-3. Send the request. A valid key returns HTTP `200` with:
+3. If using the imported collection's inherited authorization, first store that
+   credential in Postman Local Vault as `mst-social-api-key`. Alternatively,
+   override this request's authorization with **Bearer Token** directly. Do not
+   include `Bearer ` in Postman's token field or add a second Authorization header.
+4. Send the request. A valid key returns HTTP `200` with:
 
 ```json
 {

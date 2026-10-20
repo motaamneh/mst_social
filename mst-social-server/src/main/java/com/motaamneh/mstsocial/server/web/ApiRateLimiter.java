@@ -3,12 +3,14 @@ package com.motaamneh.mstsocial.server.web;
 import com.motaamneh.mstsocial.server.config.ApiRateLimitProperties;
 import com.motaamneh.mstsocial.server.persistence.ApiRateLimitRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /** Runs before core service calls, outside the verification workflow's transactions. */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public final class ApiRateLimiter {
     public enum Operation { CREATE, VERIFY, READ, MUTATE }
 
@@ -24,6 +26,9 @@ public final class ApiRateLimiter {
         };
         long retryAfter = repository.acquire(tenantId, operation.name(), limit);
         if (retryAfter > 0) {
+            log.atWarn().addKeyValue("event", "rate_limit.exceeded").addKeyValue("operation", operation)
+                    .addKeyValue("limitPerMinute", limit).addKeyValue("retryAfterSeconds", retryAfter)
+                    .log("Tenant rate limit exceeded");
             throw new ApiRateLimitException(retryAfter);
         }
     }

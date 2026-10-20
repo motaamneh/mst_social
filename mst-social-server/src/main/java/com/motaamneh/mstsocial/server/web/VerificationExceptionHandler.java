@@ -14,11 +14,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import lombok.extern.slf4j.Slf4j;
+import com.motaamneh.mstsocial.server.observability.SafeExceptionDetails;
+
 import java.net.URI;
 import java.util.List;
 
 /** Central HTTP translation. The core never imports HTTP or Spring types. */
 @RestControllerAdvice
+@Slf4j
 public class VerificationExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(VerificationException.class)
     ResponseEntity<Object> domain(VerificationException exception) {
@@ -59,18 +63,20 @@ public class VerificationExceptionHandler extends ResponseEntityExceptionHandler
 
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<Object> persistence(DataAccessException exception) {
+        SafeExceptionDetails.addTo(log.atError(), exception).addKeyValue("event", "storage.failed")
+                .log("Storage operation failed");
         if (exception instanceof TransientDataAccessException || exception instanceof DataAccessResourceFailureException) {
             return problem(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE",
                     "Storage is temporarily unavailable. Read the request status before retrying a mutation.");
         }
-        logger.error("Storage operation failed (" + exception.getClass().getSimpleName() + ")");
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "The operation could not be completed.");
     }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> unexpected(Exception exception) {
         // Exception messages and stack traces can contain SQL, provider payloads, or credentials.
-        logger.error("API operation failed (" + exception.getClass().getSimpleName() + ")");
+        SafeExceptionDetails.addTo(log.atError(), exception).addKeyValue("event", "application.failed")
+                .log("Unexpected API failure");
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "The operation could not be completed.");
     }
 
@@ -82,6 +88,10 @@ public class VerificationExceptionHandler extends ResponseEntityExceptionHandler
         List<FieldErrorResponse> errors = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> new FieldErrorResponse(error.getField(), error.getDefaultMessage()))
                 .distinct().toList();
+        log.atWarn().addKeyValue("event", "validation.failed").addKeyValue("code", "VALIDATION_FAILED")
+                .addKeyValue("invalidFields", errors.stream().map(FieldErrorResponse::field)
+                        .filter(java.util.Set.of("subjectId", "platform", "handle")::contains).distinct().toList())
+                .log("Request validation failed");
         return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .cacheControl(CacheControl.noStore())
                 .body(new ApiErrorResponse(URI.create("about:blank"), "Bad Request", 400, "VALIDATION_FAILED",
@@ -105,6 +115,9 @@ public class VerificationExceptionHandler extends ResponseEntityExceptionHandler
             case UNSUPPORTED_MEDIA_TYPE -> "UNSUPPORTED_MEDIA_TYPE";
             default -> resolved.is5xxServerError() ? "INTERNAL_ERROR" : "INVALID_REQUEST";
         };
+        SafeExceptionDetails.addTo(resolved.is5xxServerError() ? log.atError() : log.atWarn(), exception)
+                .addKeyValue("event", "http.request.rejected").addKeyValue("status", status.value())
+                .addKeyValue("code", code).log("HTTP request rejected");
         HttpHeaders safeHeaders = new HttpHeaders();
         safeHeaders.putAll(headers);
         safeHeaders.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
@@ -115,6 +128,9 @@ public class VerificationExceptionHandler extends ResponseEntityExceptionHandler
     }
 
     private static ResponseEntity<Object> problem(HttpStatus status, String code, String detail) {
+        var event = status.is5xxServerError() ? log.atError() : log.atWarn();
+        event.addKeyValue("event", "api.operation.rejected").addKeyValue("status", status.value())
+                .addKeyValue("code", code).log("API operation rejected");
         return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .cacheControl(CacheControl.noStore()).body(ApiErrorResponse.of(status, code, detail));
     }

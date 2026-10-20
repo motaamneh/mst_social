@@ -3,6 +3,10 @@
 This guide takes you from an empty `mst_social_db` database to a verified Instagram
 or TikTok account. It matches the current server implementation.
 
+**Starting from IntelliJ?** The [local run guide](../docs/LOCAL_RUN_GUIDE.md) walks
+through the IDE configuration, pgAdmin tenant creation, and Terminal commands for
+generating the Bearer credential, including common environment-variable mistakes.
+
 **Using Docker?** First follow the [Docker guide](../docs/DOCKER_GUIDE.md) through
 tenant/API-key creation, then continue here at step 5. Docker has its own PostgreSQL
 database; it does not automatically reuse tenants or credentials from your IDE setup.
