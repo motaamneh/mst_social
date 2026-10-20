@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,7 @@ import static com.motaamneh.mstsocial.server.web.ApiRateLimiter.Operation.*;
         content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiErrorResponse.class)))
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping(value = "/api/v1/verifications", produces = MediaType.APPLICATION_JSON_VALUE)
 public class VerificationController {
     private final VerificationService verificationService;
@@ -56,6 +58,9 @@ public class VerificationController {
         rateLimiter.check(principal.tenantId(), CREATE);
         var created = verificationService.createVerification(principal.tenantId(),
                 new CreateVerificationCommand(input.getSubjectId(), input.getPlatform(), input.getHandle()));
+        log.atInfo().addKeyValue("event", "verification.created")
+                .addKeyValue("verificationId", created.requestId()).addKeyValue("platform", input.getPlatform())
+                .addKeyValue("expiresAt", created.expiresAt()).log("Verification created");
         URI location = URI.create(request.getContextPath() + "/api/v1/verifications/" + created.requestId());
         return ResponseEntity.created(location).cacheControl(CacheControl.noStore())
                 .body(VerificationCreatedResponse.from(created));
@@ -73,8 +78,11 @@ public class VerificationController {
                     example = "00000000-0000-4000-8000-000000000001") @PathVariable UUID id
     ) {
         rateLimiter.check(principal.tenantId(), READ);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(VerificationResponse.from(verificationService.getVerification(principal.tenantId(), id)));
+        var verification = verificationService.getVerification(principal.tenantId(), id);
+        log.atDebug().addKeyValue("event", "verification.read").addKeyValue("verificationId", id)
+                .addKeyValue("state", verification.status()).addKeyValue("failedAttempts", verification.failedAttempts())
+                .log("Verification status read");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(VerificationResponse.from(verification));
     }
 
     @Operation(operationId = "verifyProfile", summary = "Verify the code against the public profile bio",
@@ -96,6 +104,8 @@ public class VerificationController {
         ApiRequestChecks.requireNoIdempotencyKey(request);
         ApiRequestChecks.requireEmptyBody(request);
         rateLimiter.check(principal.tenantId(), VERIFY);
+        log.atDebug().addKeyValue("event", "verification.started").addKeyValue("verificationId", id)
+                .log("Verification attempt started");
         return httpMapper.toResponse(verificationService.verify(principal.tenantId(), id));
     }
 
@@ -115,7 +125,9 @@ public class VerificationController {
         ApiRequestChecks.requireNoIdempotencyKey(request);
         ApiRequestChecks.requireEmptyBody(request);
         rateLimiter.check(principal.tenantId(), MUTATE);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(VerificationResponse.from(verificationService.cancelVerification(principal.tenantId(), id)));
+        var verification = verificationService.cancelVerification(principal.tenantId(), id);
+        log.atInfo().addKeyValue("event", "verification.cancel.completed").addKeyValue("verificationId", id)
+                .addKeyValue("state", verification.status()).log("Cancellation processed");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(VerificationResponse.from(verification));
     }
 }

@@ -18,6 +18,19 @@ Use [Swagger UI](../docs/SWAGGER_GUIDE.md) at `/swagger-ui.html` when
 available at `/v3/api-docs` and `/v3/api-docs.yaml`. The Java annotations and
 OpenAPI configuration are the source of the checked-in YAML export.
 
+## Request logs
+
+API responses include a server-generated `X-Request-Id` UUID for finding related
+logs. It differs from the verification `requestId` in response bodies. Authentication,
+workflow outcomes, provider timing, rate limits, and failures share this correlation
+context. INFO is the default; set `MST_LOG_LEVEL=DEBUG` for request starts, authenticated
+identity, reads, and transaction timings. `MST_LOG_FORMAT=logstash` enables JSON output.
+
+Restart IntelliJ after rebuilding, or recreate your Docker container. The
+[logging guide](../docs/LOGGING_GUIDE.md) explains each event, 401 failure reasons,
+log levels, and fields that are excluded. API keys, codes, bios, handles, subject IDs,
+and request/response bodies are never included in these application events.
+
 ## Endpoints
 
 Paths below start with `/api/v1`. Resource IDs are UUIDs.

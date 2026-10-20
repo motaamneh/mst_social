@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ import static com.motaamneh.mstsocial.server.web.ApiRateLimiter.Operation.*;
         content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiErrorResponse.class)))
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping(value = "/api/v1/social-identities", produces = MediaType.APPLICATION_JSON_VALUE)
 public class VerifiedAccountController {
     private final VerificationService verificationService;
@@ -45,8 +47,10 @@ public class VerifiedAccountController {
                     example = "00000000-0000-4000-8000-000000000001") @PathVariable UUID id
     ) {
         rateLimiter.check(principal.tenantId(), READ);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(VerifiedAccountResponse.from(verificationService.getVerifiedAccount(principal.tenantId(), id)));
+        var account = verificationService.getVerifiedAccount(principal.tenantId(), id);
+        log.atDebug().addKeyValue("event", "account.read").addKeyValue("accountId", account.accountId())
+                .addKeyValue("active", account.active()).log("Account association read");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(VerifiedAccountResponse.from(account));
     }
 
     /** Revoke the association while preserving its historical account and request links. */
@@ -65,7 +69,10 @@ public class VerifiedAccountController {
         ApiRequestChecks.requireNoIdempotencyKey(request);
         ApiRequestChecks.requireEmptyBody(request);
         rateLimiter.check(principal.tenantId(), MUTATE);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(VerifiedAccountResponse.from(verificationService.revokeVerifiedAccount(principal.tenantId(), id)));
+        var account = verificationService.revokeVerifiedAccount(principal.tenantId(), id);
+        log.atInfo().addKeyValue("event", "account.revoke.completed").addKeyValue("accountId", account.accountId())
+                .addKeyValue("active", account.active()).addKeyValue("revokedAt", account.revokedAt())
+                .log("Account revocation processed");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(VerifiedAccountResponse.from(account));
     }
 }

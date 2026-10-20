@@ -9,13 +9,30 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 import java.net.URI;
 import java.time.Duration;
 
 @Component
+@Slf4j
 public final class VerificationHttpMapper {
     public ResponseEntity<?> toResponse(VerificationResult result) {
         VerificationResponse verification = VerificationResponse.from(result.verification());
+        var event = result.account() != null ? log.atInfo() : log.atWarn();
+        event.addKeyValue("event", "verification.completed")
+                .addKeyValue("verificationId", verification.requestId())
+                .addKeyValue("platform", verification.platform()).addKeyValue("outcome", result.outcome())
+                .addKeyValue("state", verification.status()).addKeyValue("failedAttempts", verification.failedAttempts())
+                .addKeyValue("maxFailedAttempts", verification.maxFailedAttempts());
+        if (result.providerFailure() != null) {
+            event.addKeyValue("providerReason", result.providerFailure().reason())
+                    .addKeyValue("retryable", result.providerFailure().retryable());
+        }
+        if (result.account() != null) {
+            event.addKeyValue("accountId", result.account().accountId()).addKeyValue("active", result.account().active())
+                    .addKeyValue("validUntil", result.account().validUntil());
+        }
+        event.log("Verification attempt completed");
         if (result.account() != null) {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                     .body(new VerificationAttemptResponse(result.outcome(), verification,

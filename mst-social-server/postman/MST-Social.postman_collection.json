@@ -47,7 +47,7 @@
           "response": []
         },
         {
-          "name": "02 - Who am I",
+          "name": "02 - Who am I (authenticated tenant)",
           "request": {
             "method": "GET",
             "header": [
@@ -67,7 +67,7 @@
                 "tenant"
               ]
             },
-            "description": "Expect 200 with tenantId and credentialId. Copy them into the environment for reference. They are derived from the API key and are never submitted as tenant selectors. A 401 means the tenant credential could not authenticate."
+            "description": "Returns the tenantId and credentialId for the tenant API key sent in Authorization. This is not a login or key-creation endpoint. Create a tenant key with the tenant-key CLI; it starts with mst_api_. SearchAPI keys, server hash keys, and tenant UUIDs cannot authenticate here. The request inherits collection Bearer authentication from {{vault:mst-social-api-key}}. Create that Vault secret or select Bearer Token on this request and paste the full tenant key without the Bearer prefix. Expect 200; a missing/invalid/expired/revoked key returns 401. CLI and server must use the same database and MST_TENANT_API_KEY_HASH_KEY."
           },
           "response": []
         }

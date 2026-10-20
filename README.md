@@ -4,6 +4,12 @@ An open-source Java project for verifying control of social accounts through tem
 
 The repository contains the core verification workflows, a SearchAPI provider, and a Spring Boot verification API with PostgreSQL storage and tenant API-key authentication. Run it locally with Docker Compose or build the Java artifacts directly.
 
+## Run locally with IntelliJ
+
+Follow the [local run and Bearer authentication guide](docs/LOCAL_RUN_GUIDE.md)
+to configure PostgreSQL and IntelliJ, create a tenant, generate its API key in
+Terminal, and complete a verification in Postman.
+
 ## Run locally with Docker
 
 With Docker Desktop running, create your local configuration from the template:
@@ -35,6 +41,11 @@ For IntelliJ or JAR runs, set `MST_API_DOCS_ENABLED=true` and restart.
 Use **Authorize** with a tenant API key to execute API requests.
 Follow the [Swagger walkthrough](docs/SWAGGER_GUIDE.md) for setup, authentication,
 verification, error handling, and disabling the docs.
+
+## Troubleshooting and logs
+
+See the [logging guide](docs/LOGGING_GUIDE.md) to trace API requests by
+`X-Request-Id`, diagnose tenant-key failures, enable DEBUG detail, or switch to JSON logs.
 
 ## Modules
 

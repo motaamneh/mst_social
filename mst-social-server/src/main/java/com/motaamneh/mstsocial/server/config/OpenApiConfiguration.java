@@ -118,7 +118,11 @@ public class OpenApiConfiguration {
             }
             responses.addApiResponse("default", problem(400, "INVALID_REQUEST",
                     "Other HTTP failures use this problem shape (for example 405 METHOD_NOT_ALLOWED)."));
-            responses.values().forEach(response -> response.addHeaderObject("Cache-Control", new Header()
+            responses.values().forEach(response -> response
+                    .addHeaderObject("X-Request-Id", new Header()
+                            .description("Server-generated correlation UUID; use it to find request logs")
+                            .schema(new StringSchema().format("uuid")))
+                    .addHeaderObject("Cache-Control", new Header()
                     .description("Responses must not be cached").schema(new StringSchema().example("no-store"))));
         }));
     }

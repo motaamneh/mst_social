@@ -70,3 +70,12 @@ mst:
     active-key-version: v1
     keys:
       v1: ${MST_VERIFICATION_KEY_V1:}
+
+logging:
+  level:
+    com.motaamneh.mstsocial.server: ${MST_LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [httpRequestId=%X{httpRequestId:-none} tenantId=%X{tenantId:-none}] [%thread] %logger{36} : %msg %kvp%n%wEx"
+  structured:
+    format:
+      console: ${MST_LOG_FORMAT:}

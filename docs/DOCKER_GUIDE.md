@@ -456,6 +456,14 @@ The switch controls the UI and OpenAPI JSON/YAML routes. It does not remove
 authentication from the API. Use `up` to apply environment changes; `restart` alone
 keeps the old container environment.
 
+### Detailed application logs
+
+Set `MST_LOG_LEVEL=DEBUG` in `.env.docker` for additional detail, and optionally
+`MST_LOG_FORMAT=logstash` for JSON. Apply changes with
+`docker compose --env-file .env.docker up -d --wait app`, then follow
+`docker compose --env-file .env.docker logs -f app`.
+See the [logging guide](LOGGING_GUIDE.md) for request IDs and event meanings.
+
 ## 8. Daily commands and what they mean
 
 | Task | Command |
