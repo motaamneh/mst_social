@@ -57,11 +57,11 @@ bio you can edit for the successful verification flow.
 Open Terminal in the repository root:
 
 ```sh
-cd /Users/motaamneh/IdeaSnapshots/mst_social
+cd /path/to/mst_social
 java -version
 ```
 
-On another machine, replace the path with your own checkout. Use Java 21 for both
+Replace the path above with your own checkout. Use Java 21 for both
 the build and the JAR commands below.
 
 ### Database

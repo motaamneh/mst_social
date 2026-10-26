@@ -666,25 +666,9 @@ This setup adds packaging and documentation; it does not change the Java request
 models, database schema, or verification rules. Container builds skip automated
 tests.
 
-## 12. Checks performed during implementation
+## 12. What was checked
 
-On 2026-10-18, using Docker Desktop on Apple Silicon (Linux ARM64 containers):
-
-- Built `mst-social:local` from source; all Maven modules packaged successfully,
-  with test compilation and execution skipped.
-- Validated the Compose configuration without printing environment values.
-- Started an isolated project with temporary internal secrets and a dummy provider
-  key; both services became healthy.
-- Confirmed the health endpoint was reachable through its localhost port mapping.
-- Confirmed PostgreSQL applied migrations V1–V4 successfully.
-- Confirmed the application process used non-root UID/GID 10001.
-- Created a tenant in the isolated database and generated a credential through an
-  interactive `docker compose exec app` session.
-- Removed and recreated the containers while retaining the volume; the tenant and
-  credential metadata survived.
-- Removed the isolated check containers, network, and temporary database volume.
-  The built application image remains available locally.
-
-No automated test files were added or executed, and no live SearchAPI requests were
-made. These checks cover container build/startup, provisioning, and persistence;
-they do not establish successful live bio verification or AMD64 runtime behavior.
+See the [verification log](VERIFICATION_LOG.md#2026-10-18--docker-packaging-and-compose)
+for the container build, startup, provisioning, and persistence checks performed on
+this setup, and for what was not exercised. The optional backup and restore
+instructions above were reviewed against PostgreSQL documentation but not executed.

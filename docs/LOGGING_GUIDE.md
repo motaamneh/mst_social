@@ -170,19 +170,9 @@ distributed tracing implementation. MDC does not automatically cross arbitrary
 async executor boundaries. The current synchronous provider wrapper logs before
 and after its call on the request thread.
 
-## Verification performed
+## What was checked
 
-On 2026-10-19, Maven packaging and the Docker build passed with
-`-Dmaven.test.skip=true`. Manual requests against a disposable isolated database
-covered missing credentials (401), valid credentials (200), creation (201), invalid
-input (400), status reads (200), cancellation (200), and attempting an already
-canceled verification (409). The last operation made no provider call.
-
-Inspected JSON/DEBUG and text/INFO output, response/log request-ID correlation,
-ignored caller-supplied correlation IDs, and absence of tenant context on a later
-unauthenticated request. The checked log did not contain the temporary credential,
-returned verification code, submitted handle, or subject ID.
-
-No automated test files were created and no automated tests ran. No live SearchAPI
-call or forced database outage was used, so provider and outage log paths were
-reviewed in code rather than exercised against those external services.
+These logs were verified manually, not by an automated test suite. See the
+[verification log](VERIFICATION_LOG.md#2026-10-19--request-logging) for the checks
+performed on this feature, including which provider and outage paths were reviewed
+in code rather than exercised against live services.

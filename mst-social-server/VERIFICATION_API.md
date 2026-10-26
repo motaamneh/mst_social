@@ -297,5 +297,5 @@ explicit constructors and accessors, without Spring or Lombok dependencies.
 
 An actual successful bio verification requires an explicitly initiated SearchAPI
 lookup against a profile with the returned code. That consumes provider usage.
-The build command skips test compilation and execution; no automated tests were
-added for this branch.
+There is no automated test suite yet; see the
+[verification log](../docs/VERIFICATION_LOG.md) for what has been checked manually.

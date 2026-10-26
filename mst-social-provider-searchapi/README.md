@@ -67,8 +67,10 @@ From the repository root:
 ./mvnw -B -Dmaven.test.skip=true -pl mst-social-provider-searchapi -am compile
 ```
 
-No tests or live API calls were run during implementation. Provider error-payload
-semantics and runtime behavior still need validation before release.
+No tests or live API calls were run during implementation, so the mapping above
+reflects intended behavior reviewed in code rather than observed provider responses.
+Provider error-payload semantics and runtime behavior still need validation before
+release. See the [verification log](../docs/VERIFICATION_LOG.md#provider-adapter).
 
 References: [Instagram](https://www.searchapi.io/docs/instagram-profile-api),
 [TikTok](https://www.searchapi.io/docs/tiktok-profile-api),
