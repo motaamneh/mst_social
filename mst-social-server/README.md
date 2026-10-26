@@ -366,15 +366,7 @@ and Compose file. Published registry images, durable creation-response replay, a
 edge/IP throttling remain future work. Do not send `Idempotency-Key`: mutations explicitly reject it until
 replay semantics are implemented. See the API guide for retry behavior and limits.
 
-This branch was packaged with test compilation and execution skipped. No automated
-tests were added or run, and no live provider calls were made.
-
-Local runtime checks on 2026-10-13 confirmed successful Flyway migrations through
-V3, aggregate health returning HTTP 200, and the identity endpoint returning the
-correct tenant and credential IDs with HTTP 200. Missing credentials, an altered
-secret, and a revoked credential returned HTTP 401. Both local credential creation
-and revocation succeeded, and revocation took effect without restarting the server.
-These historical checks cover authentication. The verification API branch builds
-with `./mvnw -B -o -Dmaven.test.skip=true package`. Its first local startup attempt
-on 2026-10-17 stopped because PostgreSQL was not listening on localhost:5432;
-runtime API checks require that database to be started.
+There is no automated test suite yet. The
+[verification log](../docs/VERIFICATION_LOG.md) records the manual runtime checks
+performed on authentication, migrations, health, and credential provisioning,
+along with what was not exercised.

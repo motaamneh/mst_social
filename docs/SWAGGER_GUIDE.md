@@ -255,20 +255,8 @@ Import the YAML into Postman, or use the existing
 
 Dependency and configuration reference: [official springdoc documentation](https://springdoc.org/).
 
-## Implementation checks
+## What was checked
 
-Checked on 2026-10-18 using Java 21 and an isolated Docker Compose database:
-
-- Maven packaging and the Docker image build succeeded with `-Dmaven.test.skip=true`.
-- Swagger's entry route redirected to its UI; the UI, JavaScript assets, configuration,
-  and OpenAPI JSON/YAML endpoints responded successfully.
-- The generated contract contained seven operations and nine DTO schemas, with all
-  schema references resolved and no principal or tenant-selector request parameters.
-- Swagger configuration reported authorization persistence disabled and no remote validator.
-- API calls without a tenant credential returned `401`.
-- With docs disabled, all checked documentation routes/assets returned `401`, while
-  health still returned `200`.
-
-No automated tests were written or run. No SearchAPI requests were made. These were
-HTTP and schema checks; browser rendering and an authenticated Swagger Execute flow
-were not exercised. The temporary Compose stack and its disposable volume were removed.
+See the [verification log](VERIFICATION_LOG.md#2026-10-18--swagger-ui-and-openapi)
+for the HTTP and schema checks performed on the documentation endpoints, and for
+what was not exercised.
