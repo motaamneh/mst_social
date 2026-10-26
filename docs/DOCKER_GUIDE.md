@@ -8,8 +8,9 @@ All commands run from the repository root unless stated otherwise.
 
 - New to Docker: read sections 1–3, then follow section 4 onward.
 - Ready to run: start at [section 4](#4-start-the-project-yourself).
-- API running: create your [tenant](#5-create-a-tenant-in-the-docker-database) and
-  [API key](#6-create-the-tenants-api-key), then use [Postman](#7-use-postman).
+- API running: create your
+  [tenant and API key](#5-create-a-tenant-and-its-first-api-key),
+  then use [Postman](#7-use-postman).
 - Returning later: see [daily commands](#8-daily-commands-and-what-they-mean),
   including backups and updates.
 - Startup failed: see [troubleshooting](#10-common-mistakes-and-how-to-diagnose-them).
@@ -337,21 +338,39 @@ container repeatedly showing `Restarting` means you should inspect the error bef
 provisioning tenants. Logs ending in `Connection to localhost:5432 refused` from a
 standalone image are not a successful Compose startup.
 
-## 5. Create a tenant in the Docker database
+## 5. Create a tenant and its first API key
 
 The database is new, so tenant IDs from your laptop's separate PostgreSQL database
 do not automatically exist here. After the app has migrated the schema, run:
 
 ```sh
-docker compose --env-file .env.docker exec db \
-  psql -U mst_social -d mst_social_db \
-  -c 'INSERT INTO tenants DEFAULT VALUES RETURNING id;'
+docker compose --env-file .env.docker exec app \
+  java -jar /app/app.jar tenant create --name="Local Postman"
 ```
 
-`exec db` means “run this command inside the already running database container.”
-`psql` is already installed there; you do not need to install it on your laptop.
-Copy the returned UUID. Create one tenant for your consuming application, not one
-for every verification request.
+This starts an additional Java process inside `app`, using its existing database
+configuration and hash key. The `tenant` argument selects the local administration
+mode; it does not start a second web server or call SearchAPI. It inserts the tenant
+row and issues that tenant's first credential in one step, printing:
+
+```text
+Tenant ID:     <generated tenant UUID>
+Credential ID: <generated credential UUID>
+Expires at:    never
+
+Store this credential securely; it cannot be retrieved again:
+mst_api_<credential UUID>.<64 hexadecimal characters>
+```
+
+Compose `exec` supplies an interactive terminal by default. **Do not add `-T`, pipe
+the command, or redirect its output.** The command requires `System.console()` so the
+one-time credential only ever appears in an interactive session; it refuses to run
+otherwise, before touching the database.
+
+Save the entire `mst_api_...` credential shown once. For Postman, store it in Local
+Vault as `mst-social-api-key`. It is different from the SearchAPI key and the two
+server hash keys. Create one tenant for your consuming application, not one for
+every verification request.
 
 To see existing tenants:
 
@@ -361,38 +380,36 @@ docker compose --env-file .env.docker exec db \
   -c 'SELECT id, created_at FROM tenants ORDER BY created_at DESC;'
 ```
 
+`exec db` means “run this command inside the already running database container.”
+`psql` is already installed there; you do not need to install it on your laptop.
+You can still create a tenant row on its own with
+`INSERT INTO tenants DEFAULT VALUES RETURNING id;` and then issue its key with
+`tenant-key create`; the single command above does both.
+
 The usual project name is `mst-social`, so the volume is normally named
 `mst-social_postgres_data`. If you choose another Compose project name with `-p`,
 it gets a separate volume and network. Use the same project name on every command.
 
-## 6. Create the tenant's API key
+## 6. Add more keys, expiry, rotation, and revocation
 
-Use Terminal and replace the placeholder:
+One tenant can have several credentials, so staging, deployment, and rotation do not
+require sharing one key. Step 5 issued the first key. To issue an additional key for
+an existing tenant:
 
 ```sh
 docker compose --env-file .env.docker exec app \
   java -jar /app/app.jar tenant-key create \
   --tenant-id="REPLACE_WITH_TENANT_UUID" \
-  --name="Local Postman"
+  --name="Second key"
 ```
 
-This starts an additional Java process inside `app`, using its existing database
-configuration and hash key. The `tenant-key` argument selects the local
-administration mode; it does not start a second web server or call SearchAPI.
-
-Compose `exec` supplies an interactive terminal by default. **Do not add `-T`, pipe
-the command, or redirect its output when creating a key.** Your code requires
-`System.console()` so the one-time credential is shown in an interactive session.
-
-Save the entire `mst_api_...` credential shown once. For Postman, store it in Local
-Vault as `mst-social-api-key`. It is different from the SearchAPI key and the two
-server hash keys.
-
-For command usage:
+The same interactive-terminal rule applies. For command usage:
 
 ```sh
 docker compose --env-file .env.docker exec app \
   java -jar /app/app.jar tenant-key --help
+docker compose --env-file .env.docker exec app \
+  java -jar /app/app.jar tenant --help
 ```
 
 ### Credential expiry, rotation, and revocation
@@ -634,7 +651,7 @@ features. Use literal values in that file. Stop this standalone container with
 | App fails during startup | Read `logs --tail=100 app`. Check secret lengths, PostgreSQL health, and Flyway errors. |
 | API key gives 401 | Create/use a key from this Docker database and the same server hash key. Your IDE database's key is not automatically copied here. |
 | Cannot reach PostgreSQL from pgAdmin on localhost:5432 | Compose deliberately does not publish its database port. Use `exec db psql`, or configure a deliberate local-only port mapping if needed. |
-| tenant-key says an interactive console is required | Run the documented `exec app` command in Terminal without `-T`, redirection, or pipes. |
+| `tenant` or `tenant-key` says an interactive console is required | Run the documented `exec app` command in Terminal without `-T`, redirection, or pipes. |
 | Changed Java code has no effect | Rebuild and recreate the app with `up --build`; restarting the old container uses its old image. |
 | Health works but verification fails | Health does not verify provider credentials, provider availability, or the social bio. Inspect the API error response. |
 | An image download or Maven dependency download fails | Check network/registry connectivity, resolve the reported error, then rerun the build. |

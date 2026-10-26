@@ -16,7 +16,7 @@ and your local PostgreSQL database can contain different tenants and credentials
 | --- | --- | --- |
 | Tenant | Your application using MST Social | You create one row in PostgreSQL |
 | `tenantId` | That application's UUID | PostgreSQL generates it |
-| Tenant API key | Credential your backend sends with API requests | The `tenant-key create` command generates it |
+| Tenant API key | Credential your backend sends with API requests | The `tenant create` command generates it with the tenant; `tenant-key create` adds more |
 | `credentialId` | UUID identifying that particular API key | The same command; useful for revoking a key |
 | `subjectId` | A user in your application | Your own user database; use `user-123` in this walkthrough |
 | Verification `requestId` | One social-account verification request | The create-verification API |
@@ -159,7 +159,10 @@ have a working API key, `/api/v1/tenant` also tells you its tenant ID.
 
 ### If this is a new application
 
-Run this once:
+You do not need SQL. Step 6 creates the tenant and issues its first API key in a
+single command. Continue to step 5 to set up Terminal, then run it.
+
+If you would rather create the tenant row yourself, run this once:
 
 ```sql
 INSERT INTO tenants DEFAULT VALUES RETURNING id;
@@ -168,8 +171,8 @@ INSERT INTO tenants DEFAULT VALUES RETURNING id;
 Copy the returned UUID. PostgreSQL generates it automatically. Commit the
 transaction if pgAdmin auto-commit is disabled; otherwise the CLI cannot see it.
 
-There is no HTTP tenant-creation endpoint. This initial step requires trusted
-database access. Each execution of the INSERT creates another tenant.
+There is no HTTP tenant-creation endpoint. Provisioning requires trusted database
+access either way. Each execution of the INSERT creates another tenant.
 
 ## 5. Give Terminal the same database settings and tenant hash key
 
@@ -203,12 +206,39 @@ and permitted by your PostgreSQL setup.
 These exports apply to this Terminal session. A new session needs them again.
 Administration mode does not need `SEARCHAPI_API_KEY` or `MST_VERIFICATION_KEY_V1`.
 
-## 6. Generate the tenant's Bearer credential
+## 6. Create the tenant and its Bearer credential
 
-In that same Terminal, enter the tenant UUID from step 4:
+For a new application, one command in that same Terminal creates the tenant and
+issues its first key:
 
 ```sh
-read -r 'MST_LOCAL_TENANT_ID?Tenant UUID from pgAdmin: '
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar \
+  tenant create --name="Local Postman"
+```
+
+`Local Postman` labels the new credential; the tenants table has no name column.
+Options use `--option=value` syntax.
+
+Use an interactive Terminal, not IntelliJ's Run output console. Do not pipe or
+redirect this command: it requires an interactive console and refuses to run
+without one, before it touches the database.
+
+Expected output includes:
+
+```text
+Tenant ID:     <generated tenant UUID>
+Credential ID: <generated credential UUID>
+Expires at:    never
+
+Store this credential securely; it cannot be retrieved again:
+mst_api_<credential UUID>.<64 hexadecimal characters>
+```
+
+If the tenant already exists, because you created it in step 4 or on an earlier
+run, issue a key for that tenant instead:
+
+```sh
+read -r 'MST_LOCAL_TENANT_ID?Existing tenant UUID: '
 
 java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar \
   tenant-key create \
@@ -216,21 +246,7 @@ java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar \
   --name="Local Postman"
 ```
 
-`MST_LOCAL_TENANT_ID` is just a shell variable used by this example. `Local Postman`
-is a label for the new credential. Options use `--option=value` syntax.
-
-Use an interactive Terminal, not IntelliJ's Run output console. Do not pipe or
-redirect this command: key creation requires an interactive console.
-
-Expected output includes:
-
-```text
-Credential ID: <generated credential UUID>
-Tenant ID: <your tenant UUID>
-Expires at: never
-Store this credential securely; it cannot be retrieved again:
-mst_api_<credential UUID>.<64 hexadecimal characters>
-```
+`MST_LOCAL_TENANT_ID` is just a shell variable used by this example.
 
 Save the **entire final line**, including `mst_api_`, the UUID, the dot, and the
 secret. Save the credential ID as well. The database stores a digest, so the full

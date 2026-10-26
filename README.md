@@ -89,22 +89,18 @@ then start the API and PostgreSQL:
 docker compose --env-file .env.docker up --build -d --wait
 ```
 
-Create a tenant — one per consuming application:
-
-```sh
-docker compose --env-file .env.docker exec db \
-  psql -U mst_social -d mst_social_db \
-  -c 'INSERT INTO tenants DEFAULT VALUES RETURNING id;'
-```
-
-Issue that tenant an API key (run interactively — the one-time secret is printed
-only to a real console):
+Create a tenant and issue its first API key in one command. Run it interactively —
+the one-time credential is printed only to a real console:
 
 ```sh
 docker compose --env-file .env.docker exec app \
-  java -jar /app/app.jar tenant-key create \
-  --tenant-id="REPLACE_WITH_TENANT_UUID" --name="Local"
+  java -jar /app/app.jar tenant create --name="My app"
 ```
+
+It prints the tenant ID, the credential ID, and the credential itself. Save the whole
+`mst_api_...` line: it is shown once, and the database stores only a digest. Create
+one tenant per consuming application, not one per user. To add further keys to that
+tenant later, use `tenant-key create --tenant-id=<uuid> --name=<name>`.
 
 Then open **Swagger UI** at <http://localhost:8080/swagger-ui.html>, click
 **Authorize**, paste the key, and run the flow. No local Java, Maven, or PostgreSQL

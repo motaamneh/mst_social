@@ -101,7 +101,9 @@ the target schema. Production deployments may use separate migration/runtime rol
 | `flyway_schema_history` | Migration history managed by Flyway |
 
 Tenants are not PostgreSQL usernames or end users. Provision a tenant explicitly
-after migration. V2 generates its UUID automatically when omitted:
+after migration. The `tenant create` command below inserts the row and issues its
+first credential in one step. V2 also generates the UUID automatically if you insert
+the row yourself:
 
 ```sql
 INSERT INTO tenants DEFAULT VALUES RETURNING id;
@@ -124,7 +126,7 @@ credential IDs for the key you send. It does not log in a social user or issue a
 
 | Value | Purpose | Use as the API Bearer token? |
 | --- | --- | --- |
-| Full `mst_api_...` credential from `tenant-key create` | Authenticate your application backend | Yes |
+| Full `mst_api_...` credential from `tenant create` or `tenant-key create` | Authenticate your application backend | Yes |
 | `SEARCHAPI_API_KEY` | Let this server call SearchAPI | No |
 | `MST_TENANT_API_KEY_HASH_KEY` | Server secret for hashing tenant credentials | No |
 | `MST_VERIFICATION_KEY_V1` | Server secret for verification codes | No |
@@ -162,20 +164,31 @@ Flyway before performing its operation.
 
 ### 2. Choose a tenant
 
-Use an existing tenant's UUID or create one in your database console:
+The tenant represents a consuming application, such as your Next.js backend.
+One tenant can have several credentials, so staging, deployment, and rotation
+do not require sharing one key.
+
+For a new application, skip ahead: step 3 creates the tenant and its first
+credential together. To reuse an existing tenant, take its UUID from your database
+console or from `GET /api/v1/tenant` with a working key. You can also insert the
+row on its own:
 
 ```sql
 INSERT INTO tenants DEFAULT VALUES RETURNING id;
 ```
 
-The tenant represents a consuming application, such as your Next.js backend.
-One tenant can have several credentials, so staging, deployment, and rotation
-do not require sharing one key.
-
 ### 3. Create a credential locally
 
 In an **interactive terminal**, set the three database variables and the same
-`MST_TENANT_API_KEY_HASH_KEY` used by your server. Then run:
+`MST_TENANT_API_KEY_HASH_KEY` used by your server. Then, for a new application:
+
+```sh
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant create \
+  --name="Development backend"
+```
+
+This prints the tenant ID, the credential ID, and the one-time credential. For an
+existing tenant, issue a credential for it instead:
 
 ```sh
 java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-key create \
@@ -183,7 +196,7 @@ java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-k
   --name="Development backend"
 ```
 
-Replace the angle-bracket placeholder before running the command. Add
+Replace the angle-bracket placeholder before running that command. Add
 `--expires-at=2030-01-01T00:00:00Z` to schedule expiry; choose a date in the future.
 Without it, the credential stays active until revoked. PostgreSQL timestamp
 precision is one microsecond; provisioning normalizes timestamps to that precision.
