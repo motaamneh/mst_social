@@ -28,7 +28,7 @@ is one **tenant**. Alice and Bob are **subjects** within that tenant.
 
 | Name | Meaning | Where you get it |
 | --- | --- | --- |
-| `tenantId` | Your consuming application's identity | PostgreSQL creates it when you insert a tenant; `/api/v1/tenant` also returns it after authentication |
+| `tenantId` | Your consuming application's identity | PostgreSQL generates it; the `tenant create` command prints it, and `/api/v1/tenant` also returns it after authentication |
 | `credentialId` | Identifies one API key belonging to that tenant | The local key command, or `/api/v1/tenant` |
 | Tenant API key | Secret that authenticates your backend to MST Social | The local key command displays it once |
 | `subjectId` | Your application's user ID, for example `user-123` | Your own application; choose a sample string for this walkthrough |
@@ -151,7 +151,11 @@ and schema as the application.
 
 ### First application: create a tenant
 
-In the same pgAdmin Query Tool, run this **once**:
+You do not need SQL. Step 4 creates the tenant and issues its first API key in one
+command; skip ahead to it.
+
+If you would rather create the tenant row yourself, run this **once** in the pgAdmin
+Query Tool:
 
 ```sql
 INSERT INTO tenants DEFAULT VALUES RETURNING id;
@@ -183,10 +187,11 @@ There is currently **no HTTP endpoint to create or list tenants**. Provisioning
 uses trusted database access. Your application's normal API requests must not
 send a tenant selector in their body, URL query, or custom header.
 
-## 4. Create a tenant API key
+## 4. Create the tenant and its API key
 
-Use an interactive Terminal window, not the IntelliJ Run output console. The key
-creation command refuses to run without an interactive console.
+Use an interactive Terminal window, not the IntelliJ Run output console. These
+commands refuse to run without an interactive console, so the one-time credential
+cannot be redirected into a log file.
 
 Configure these four variables in that Terminal session:
 
@@ -211,22 +216,31 @@ Use exactly the same hash key as IntelliJ's server configuration. Do not generat
 a new one for this command. The local administration mode does not require the
 SearchAPI key or verification-code key and does not open an HTTP port.
 
-Replace the placeholder with the tenant UUID from step 3:
+For a new application, create the tenant and its first key together:
 
 ```sh
-java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-key create \
-  --tenant-id="REPLACE_WITH_TENANT_UUID" \
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant create \
   --name="Local Postman"
 ```
 
 The option syntax is `--name=value`. The command prints:
 
 ```text
+Tenant ID:     <generated tenant UUID>
 Credential ID: <generated credential UUID>
-Tenant ID: <your tenant UUID>
-Expires at: never
+Expires at:    never
+
 Store this credential securely; it cannot be retrieved again:
 mst_api_<credential UUID>.<64 hexadecimal characters>
+```
+
+If you already created the tenant in step 3, or you want an additional key for an
+existing tenant, replace the placeholder with that tenant UUID instead:
+
+```sh
+java -jar mst-social-server/target/mst-social-server-0.0.1-SNAPSHOT.jar tenant-key create \
+  --tenant-id="REPLACE_WITH_TENANT_UUID" \
+  --name="Local Postman"
 ```
 
 Save the **entire final line**, including `mst_api_`, the UUID, the dot, and the

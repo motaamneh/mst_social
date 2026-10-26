@@ -63,26 +63,18 @@ contract; it remains a separate operational endpoint.
 A tenant represents **your consuming application**. `subjectId` represents one
 user within that application. Swagger does not create tenants or issue keys.
 
-For Docker, create a tenant in Terminal:
-
-```sh
-docker compose --env-file .env.docker exec db \
-  psql -U mst_social -d mst_social_db \
-  -c 'INSERT INTO tenants DEFAULT VALUES RETURNING id;'
-```
-
-Copy the returned UUID and create a key:
+For Docker, create a tenant and its first key in one command:
 
 ```sh
 docker compose --env-file .env.docker exec app \
-  java -jar /app/app.jar tenant-key create \
-  --tenant-id="REPLACE_WITH_TENANT_UUID" \
-  --name="Local Swagger"
+  java -jar /app/app.jar tenant create --name="Local Swagger"
 ```
 
 Run this interactively without `-T`, a pipe, or output redirection. Save the complete
-one-time `mst_api_...` credential. For a non-Docker server, follow the
-[credential guide](../mst-social-server/README.md#tenant-api-key-authentication).
+one-time `mst_api_...` credential; the command also prints the tenant and credential
+IDs. To add another key to an existing tenant, use
+`tenant-key create --tenant-id=<uuid> --name=<name>`. For a non-Docker server, follow
+the [credential guide](../mst-social-server/README.md#tenant-api-key-authentication).
 
 ## 4. Authorize Swagger
 
